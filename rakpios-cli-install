@@ -5,4 +5,24 @@ set -o nounset
 set -o pipefail
 set -u
 
-echo "download success"
+if [ $(id -u) -ne 0 ]; then
+  printf "Script must be run as root. Try 'sudo ./rakpios-cli-install'\n"
+  exit 1
+fi
+
+
+DIR="/bin/.rakpios-cli"
+
+if [ -d "$DIR" ]; then
+  echo "looks like rakpios-cli is already installed in "$DIR"..."
+  exit 1
+else
+  mkdir /bin/.rakpios-cli
+  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli-udp -o /bin/.rakpios-cli/rakpios-cli-udp
+  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli-network -o /bin/.rakpios-cli/rakpios-cli-network
+  chmod +x /bin/.rakpios-cli/rakpios-cli*
+fi
+
+export PATH="$DIR:$PATH"
+
+echo "install success"
