@@ -17,12 +17,14 @@ if [ -d "$DIR" ]; then
   echo "looks like rakpios-cli is already installed in "$DIR"..."
   exit 1
 else
-  mkdir /bin/.rakpios-cli
-  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli-udp -o /bin/.rakpios-cli/rakpios-cli-udp
-  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli-network -o /bin/.rakpios-cli/rakpios-cli-network
-  chmod +x /bin/.rakpios-cli/rakpios-cli*
+  mkdir -p /bin/.rakpios-cli/bin
+  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-udp -o /bin/.rakpios-cli/bin/rakpios-cli-udp
+  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-network -o /bin/.rakpios-cli/bin/rakpios-cli-network
+  chmod +x /bin/.rakpios-cli/bin/rakpios-cli*
 fi
 
-export PATH="$DIR:$PATH"
+echo "export PATH=$DIR/bin:$PATH">>~/.bashrc
+
+source ~/.bashrc
 
 echo "install success"
