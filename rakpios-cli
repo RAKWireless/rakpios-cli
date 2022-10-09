@@ -1,0 +1,104 @@
+#!/bin/bash
+
+do_check_docker_basic(){
+    if [ -x "$(command -v docker)" ]; then
+        if docker info --format '{{json .}}' | grep "permission denied"; then
+        whiptail --msgbox "Got permission denied while trying to connect to the Docker daemon socket. Please make sure the current user has the right premission." 10 60
+        exit 0
+        fi  
+    else
+        whiptail --msgbox "Docker not install, please install docker first" 20 60
+        exit 0
+    fi
+}
+
+do_get_MODEL(){
+    MODEL=$(whiptail --title "Bring up the UDP packet forwarder" --menu \
+    "Choose your RAK concentrator model" 20 78 8 \
+    "RAK7243/RAK7244" " Raspberry 3B+/4 + RAK2245 Pi HAT" \
+    "RAK7243C/RAK7244C" " Raspberry 3B+/4 + RAK2245 Pi HAT + GPS + Cellular" \
+    "RAK7246" " Raspberry Pi Zero W + RAK2246 Pi HAT" \
+    "RAK7246G" " Raspberry Pi Zero W + RAK2246 Pi HAT + GPS" \
+    "RAK7248" " Raspberry 4 + RAK2287 Pi HAT + GPS" \
+    "RAK7248C" " Raspberry 4 + RAK2287 Pi HAT + GPS + Cellular" \
+    "RAK7271" " RAK2287 mPCIe LoRa concentrator module" \
+    "RAK7371" " RAK5146 mPCIe LoRa concentrator module" 3>&1 1>&2 2>&3)
+    # exitstatus=$?
+    # if [ $exitstatus = 0 ]; then
+    #     echo "The chosen MODEL is:" $MODEL
+    # else
+    #     echo "User selected Cancel."
+    # fi
+}
+
+do_get_SERVER_HOST(){
+    SERVER_HOST=$(whiptail --inputbox "What is the server address? Default to TTN" 10 60 eu1.cloud.thethings.network --title "Server address" 3>&1 1>&2 2>&3)
+    # exitstatus=$?
+    # if [ $exitstatus = 0 ]; then
+    #     echo "Server address is configured to " $SERVER_HOST
+    # else
+    #     echo "User selected Cancel."
+    # fi
+}
+
+do_get_SERVER_PORT(){
+    SERVER_PORT=$(whiptail --inputbox "What is the server port?" 10 60 1700 --title "Server port" 3>&1 1>&2 2>&3)
+    # exitstatus=$?
+    # if [ $exitstatus = 0 ]; then
+    #     echo "Server Port is configured to " $SERVER_PORT
+    # else
+    #     echo "User selected Cancel."
+    # fi
+}
+
+do_check_udp_container(){
+   if [[ $(docker container ls -af name=udp-packet-forwarder --format true) ]]; then
+        whiptail --title "Confirmation" --yesno "The container name udp-packet-forwarder is already in use, do you want to shut it down and remove it or just exit?" 8 78 --yes-button "Stop and remove" --no-button "Exit" 
+        if [[ $? -eq 0 ]]; then 
+            docker stop udp-packet-forwarder
+            docker rm udp-packet-forwarder
+            whiptail --title "MESSAGE" --msgbox "The container named udp-packet-forwarder is stopped and removed." 8 78 
+        elif [[ $? -eq 1 ]]; then 
+            whiptail --title "MESSAGE" --msgbox "Cancelling Process since user pressed <EXIT>." 8 78
+            exit 0
+        # elif [[ $? -eq 255 ]]; then 
+        #     whiptail --title "MESSAGE" --msgbox "User pressed ESC. Exiting the script" 8 78 
+        #     exit 0
+        fi
+    fi 
+}
+
+do_udp_up(){
+    docker run -d --network host --privileged --name udp-packet-forwarder -e MODEL=$MODEL -e SERVER_HOST=$SERVER_HOST -e SERVER_PORT=$SERVER_PORT  rakwireless/udp-packet-forwarder:latest  
+    if [ $? -ne 0 ]; then
+        whiptail --msgbox "UDP packet forwarder deployed failed, please double check the hardware setup and configuration" 10 60
+        break
+    else
+        UDP_container_id=`docker ps -aqf "name=udp-packet-forwarder"`
+        GATEWAY_EUI=$(docker exec -it udp-packet-forwarder ./get_eui.sh | tr -cd  '[a-zA-Z][0-9]')
+        whiptail --title "UDP packet forwarder has been successfully deployed" --msgbox " \
+        Container id : $UDP_container_id \n \
+        Gateway EUI  : $GATEWAY_EUI \n \
+        Model        : $MODEL \n \
+        Server host  : $SERVER_HOST \n \
+        Server port  : $SERVER_PORT" 20 78
+   fi 
+}
+
+# do_udp_down(){
+#     docker stop udp-packet-forwarder
+#     if [ $? -ne 0 ]; then
+#         echo "Failed to stop portainer"
+#     else
+#         echo "udp-packet-forwarder is stopped."
+#     fi
+# }
+
+
+whiptail --msgbox "Proof of concept interactve interface to bring up UDP packet forwarder. Press OK to continue." 10 60
+do_check_docker_basic
+do_check_udp_container
+do_get_MODEL
+do_get_SERVER_HOST
+do_get_SERVER_PORT
+do_udp_up
