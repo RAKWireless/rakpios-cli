@@ -1,30 +1,113 @@
 #!/bin/bash
 
-set -o errexit
-set -o nounset
-set -o pipefail
-set -u
+# set -o errexit
+# set -o nounset
+# set -o pipefail
+# set -u
 
+# the script needs privileged access to run
 if [ $(id -u) -ne 0 ]; then
-  printf "Script must be run as root. Try 'sudo ./rakpios-cli-install'\n"
-  exit 1
+    printf "Script must be run as root. Try 'sudo ./rakpios-cli-install'\n"
+    exit 1
 fi
 
+# usage information
+usage() {
+    cat 1>&2 <<EOF
+rakpios-cli-install 0.0.1 (hash 2022-10-10)
+The installer for rakpios-cli
+USAGE:
+    rakpios-cli-install [FLAGS]
+FLAGS:
+    -i, --install           Install rakpios-cli
+    -u, --upgrade           Upgrade rakpios-cli
+    -h, --help              Prints help information
+EOF
+}
 
 DIR="/bin/.rakpios-cli"
 
-if [ -d "$DIR" ]; then
-  echo "looks like rakpios-cli is already installed in "$DIR"..."
-  exit 1
-else
-  mkdir -p /bin/.rakpios-cli/bin
-  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-udp -o /bin/.rakpios-cli/bin/rakpios-cli-udp
-  curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-network -o /bin/.rakpios-cli/bin/rakpios-cli-network
-  chmod +x /bin/.rakpios-cli/bin/rakpios-cli*
-fi
+main(){
+    SHORT=i,u,h
+    LONG=install,upgrade,help
+    OPTS=$(getopt --options $SHORT --longoptions $LONG -- "$@")
 
-echo "export PATH=$DIR/bin:$PATH">>~/.bashrc
+    if [ $? -ne 0 ]; then
+        usage
+        exit 0
+    fi
+    
+    eval set -- "$OPTS"
+    
+    while :
+    do
+        case $1 in
+            -h | --help) # display Usage information
+                usage
+                exit 0
+                ;;
+            -i | --install) # Install rakpios-cli
+                do_check_install_status
+                exit 0
+                ;;
+            -u | --upgrade) # Upgrade rakpios-cli
+                do_upgrade
+                exit 0
+                ;;
+            *)
+                echo "invalid command: $1"
+                usage
+                exit 0
+                ;;
+        esac
+    done
 
-source ~/.bashrc
+}
 
-echo "install success"
+do_check_install_status(){
+    if [ -d "$DIR" ]; then
+        echo "Looks like rakpios-cli is already installed in "$DIR"..."
+        read -p "Do you want to upgrade the rakpios-cli to the latest version (y/n)?" choice
+        case "$choice" in 
+            y|Y ) 
+                echo "Start to upgrade..."
+                do_upgrade
+                ;;
+            n|N ) 
+                echo "Cancel upgrade, exiting now..."
+                exit 1
+                ;;
+            * ) 
+                echo "Invalid option, exiting now..."
+                exit 1
+                ;;
+        esac
+    else
+        do_fresh_install
+        exit 0
+    fi 
+}
+
+do_upgrade(){
+    # remove the directory
+    rm -rf $DIR
+    # deleate the configuration saved in the bashrc
+    awk '!/rakpios-cli/' ~/.bashrc > tmpfile && mv tmpfile ~/.bashrc
+    # install the latest rakpios-cli
+    do_fresh_install
+    exit 0
+}
+
+do_fresh_install(){
+    mkdir -p $DIR/bin
+    curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-udp -o $DIR/bin/rakpios-cli-udp
+    curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-network -o $DIR/bin/rakpios-cli-network
+    chmod +x /bin/.rakpios-cli/bin/rakpios-cli*
+    # add the rakpios-cli diretory to the 
+    echo "export PATH=$DIR/bin:$PATH">>~/.bashrc
+    source ~/.bashrc
+    echo "rakpios-cli successfully installed!"
+}
+
+main "$@" || exit 1
+
