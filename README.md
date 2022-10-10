@@ -1,5 +1,10 @@
 # cli-test
-test the cli update and upgrade features
 
+## Remote bash execution script.
 
-Use `curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli-install -sSf | sudo bash` to install. 
+Use `curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli-install -sSf | sudo bash -s -- --install
+` to install. 
+
+Use `curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli-install -sSf | sudo bash -s -- --upgrade
+` to upgrade. 
+
