@@ -66,32 +66,12 @@ main(){
 
 do_check_install_status(){
     if [ -d "$DIR" ]; then
-        echo "Looks like rakpios-cli is already installed in "$DIR"..."
-        whiptail --title "Confirmation" --yesno "Do you want to upgrade the rakpios-cli to the latest version (y/n)?" 8 78 --yes-button "Upgrade" --no-button "Exit" 
+        whiptail --title "Confirmation" --yesno "Looks like rakpios-cli is already installed in "$DIR" \nDo you want to upgrade the rakpios-cli to the latest version?" 10 78 --yes-button "Yes" --no-button "No" 
         if [[ $? -eq 0 ]]; then 
             do_upgrade
-            # docker rm udp-packet-forwarder
-            # whiptail --title "MESSAGE" --msgbox "The container named udp-packet-forwarder is stopped and removed." 8 78 
         elif [[ $? -eq 1 ]]; then 
-            whiptail --title "MESSAGE" --msgbox "Cancelling Process since user pressed <EXIT>." 8 78
             exit 0
         fi    
-
-        # read "Do you want to upgrade the rakpios-cli to the latest version (y/n)?" choice
-        # case "$choice" in 
-        #     y|Y ) 
-        #         echo "Start to upgrade..."
-        #         do_upgrade
-        #         ;;
-        #     n|N ) 
-        #         echo "Cancel upgrade, exiting now..."
-        #         exit 1
-        #         ;;
-        #     * ) 
-        #         echo "Invalid option, exiting now..."
-        #         exit 1
-        #         ;;
-        # esac
     else
         do_fresh_install
         exit 0
@@ -116,7 +96,8 @@ do_fresh_install(){
     # add the rakpios-cli diretory to the 
     echo "export PATH=$DIR/bin:$PATH">>~/.bashrc
     source ~/.bashrc
-    echo "rakpios-cli successfully installed!"
+    # echo "rakpios-cli successfully installed!"
+    whiptail --msgbox "rakpios-cli successfully installed!" 10 60
 }
 
 main "$@" || exit 1
