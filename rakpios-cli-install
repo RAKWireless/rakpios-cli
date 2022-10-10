@@ -75,6 +75,7 @@ do_check_install_status(){
         elif [[ $? -eq 1 ]]; then 
             whiptail --title "MESSAGE" --msgbox "Cancelling Process since user pressed <EXIT>." 8 78
             exit 0
+        fi    
 
         # read "Do you want to upgrade the rakpios-cli to the latest version (y/n)?" choice
         # case "$choice" in 
