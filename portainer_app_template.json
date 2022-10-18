@@ -704,7 +704,7 @@
         {
           "default": "8002",
           "label": "Frontend external port",
-          "name": "external_port ",
+          "name": "external_port",
           "description": "Frontend external port bind to Zigbee2MQTT service's 8080 port. Browse to http://{host-ip}:<Frontend external port> to access the web interface."
         }
       ],
