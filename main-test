@@ -38,7 +38,7 @@ do_choose_service_env(){
             echo "The chosen variable is:" $env_name_to_configure
         else
             echo "User selected Cancel."
-            return 0
+            break
         fi
     echo $env_name_to_configure
 }
@@ -189,15 +189,26 @@ do_print_notes(){
 
 do_main_menu(){
     do_select_service
-
-
+    do_print_notes
+    while true
+    do
+        do_choose_service_env
+        if [[ $(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env[] |.label' ./portainer_app_template.json | tr -d '"') ]] ; then
+            do_change_service_env
+            do_env_variable_concat
+        fi
+        do_get_basic_info
+        do_check_service_type
+    done
 }
 
-do_select_service
-do_print_notes
-do_choose_service_env
-do_change_service_env
-do_env_variable_concat
-do_get_basic_info
-do_check_service_type
+do_main_menu
+
+# do_select_service
+# do_print_notes
+# do_choose_service_env
+# do_change_service_env
+# do_env_variable_concat
+# do_get_basic_info
+# do_check_service_type
 
