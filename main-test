@@ -37,8 +37,8 @@ do_choose_service_env(){
         if [ $exitstatus = 0 ]; then
             echo "The chosen variable is:" $env_name_to_configure
         else
-            echo "User selected Cancel."
-            break
+            echo "User selected Cancel. Return to main menu."
+            do_select_service
         fi
     echo $env_name_to_configure
 }
@@ -53,8 +53,11 @@ do_change_service_env(){
     fi
     
     # Check if there are options for the env value
-    if [[ $(jq --arg service_to_start "$service_to_start" --arg env_name_to_configure "$env_name_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_name_to_configure) | has("select")' ./portainer_app_template.json | tr -d '"') ]] ; then
+    options_exists_or_not=$(jq --arg service_to_start "$service_to_start" --arg env_name_to_configure "$env_name_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_name_to_configure) | has("select")' ./portainer_app_template.json | tr -d '"')
+    if [[ `echo ${options_exists_or_not}` == "true" ]] ; then
         echo "found options" 
+        echo "service_to_start ${service_to_start}"
+        echo "env_name_to_configure ${env_name_to_configure}"
         # declare the service list array
         option_values_array=()
         # get the list of available services
@@ -71,16 +74,24 @@ do_change_service_env(){
         exitstatus=$?
         if [ $exitstatus = 0 ]; then
             echo "The chosen service is:" $value_changed_to_text
+            value_changed_to=$(jq --arg service_to_start "$service_to_start" --arg env_name_to_configure "$env_name_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_name_to_configure) | .value ' ./portainer_app_template.json | tr -d '"')
+            echo "value changed to ${value_changed_to}"
         else
             echo "User selected Cancel."
+            do_choose_service_env
         fi
-        value_changed_to=$(jq --arg service_to_start "$service_to_start" --arg env_name_to_configure "$env_name_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_name_to_configure) | .value ' ./portainer_app_template.json | tr -d '"')
-        echo "value changed to ${value_changed_to}"
     else
         echo "no options" 
         new_env_variable_value=$(whiptail --title "Change variable" --inputbox "$env_name_to_configure_full" 20 100 "$env_variable_to_change" 3>&1 1>&2 2>&3)
-        env_variable_to_change=$new_env_variable_value
-        echo $env_variable_to_change   
+        exitstatus=$?
+        if [ $exitstatus = 0 ]; then
+            env_variable_to_change=$new_env_variable_value
+            value_changed_to=$(jq --arg service_to_start "$service_to_start" --arg env_name_to_configure "$env_name_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_name_to_configure) | .value ' ./portainer_app_template.json | tr -d '"')
+            echo "value changed to ${value_changed_to}"
+        else
+            echo "User selected Cancel."
+            do_choose_service_env
+        fi   
     fi
 }
 
@@ -189,17 +200,13 @@ do_print_notes(){
 
 do_main_menu(){
     do_select_service
-    do_print_notes
-    while true
-    do
+    if [[ $(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env[] |.label' ./portainer_app_template.json | tr -d '"') ]] ; then
         do_choose_service_env
-        if [[ $(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env[] |.label' ./portainer_app_template.json | tr -d '"') ]] ; then
-            do_change_service_env
-            do_env_variable_concat
-        fi
-        do_get_basic_info
-        do_check_service_type
-    done
+        do_change_service_env
+        do_env_variable_concat
+    fi
+    do_get_basic_info
+    do_check_service_type
 }
 
 do_main_menu
