@@ -21,6 +21,7 @@ do_select_service(){
             echo "The chosen service is:" $service_to_start
         else
             echo "User selected Cancel."
+            exit 0
         fi
 }
 
@@ -37,17 +38,10 @@ do_choose_service_env(){
             echo "The chosen variable is:" $env_name_to_configure
         else
             echo "User selected Cancel."
+            return 0
         fi
     echo $env_name_to_configure
 }
-
-# do_env_value_option(){
-
-
-
-
-
-# }
 
 do_change_service_env(){
     env_variable_to_change=$(jq --arg service_to_start "$service_to_start" --arg env_name_to_configure "$env_name_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_name_to_configure) | .default' ./portainer_app_template.json | tr -d '"')
@@ -193,7 +187,11 @@ do_print_notes(){
     whiptail --title "Notes" --msgbox  "$post_up_info" 30 78 
 }
 
+do_main_menu(){
+    do_select_service
 
+
+}
 
 do_select_service
 do_print_notes
