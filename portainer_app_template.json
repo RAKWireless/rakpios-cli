@@ -744,9 +744,15 @@
         },
         {
           "default": "db_dev",
-          "label": "MySQL service's root password ",
+          "label": "MySQL service's root password for the service called db",
           "name": "MYSQL_ROOT_PASSWORD",
-          "description": "Requested, set the root's password of MySQL service"
+          "description": "Required, must be the same with password for service named seafile"
+        },
+        {
+          "default": "db_dev",
+          "label": "MySQL service's root password for the service named seafile",
+          "name": "DB_ROOT_PASSWORD",
+          "description": "Required, must be the same with password for the service called db"
         },
         {
           "default": "me@example.com",
