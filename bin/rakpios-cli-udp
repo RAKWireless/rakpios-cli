@@ -95,10 +95,10 @@ do_udp_up(){
 # }
 
 
-whiptail --msgbox "Proof of concept interactve interface to bring up UDP packet forwarder. Press OK to continue." 10 60
-do_check_docker_basic
-do_check_udp_container
-do_get_MODEL
-do_get_SERVER_HOST
-do_get_SERVER_PORT
-do_udp_up
+# whiptail --msgbox "Proof of concept interactve interface to bring up UDP packet forwarder. Press OK to continue." 10 60
+# do_check_docker_basic
+# do_check_udp_container
+# do_get_MODEL
+# do_get_SERVER_HOST
+# do_get_SERVER_PORT
+# do_udp_up
