@@ -78,6 +78,10 @@ do_check_install_status(){
     fi 
 }
 
+do_print_install_location(){
+    echo "The rakpios-cli will be installed in the ${DIR}"
+}
+
 do_upgrade(){
     # remove the directory
     rm -rf $DIR
@@ -89,11 +93,22 @@ do_upgrade(){
 }
 
 do_fresh_install(){
-    mkdir -p $DIR/bin
-    curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-udp -o $DIR/bin/rakpios-cli-udp
-    curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/bin/rakpios-cli-network -o $DIR/bin/rakpios-cli-network
-    chmod +x /bin/.rakpios-cli/bin/rakpios-cli*
-    # add the rakpios-cli diretory to the 
+    # print install location
+    do_print_install_location
+    
+    # download the portainer app template and Stack file from portainer-template repo
+    curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
+    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
+    cp -r $DIR/portainer-templates-master/Stack/ $DIR
+    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+    
+    echo "done"
+    # download the scripts from the rakpios-cli repo 
+    curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
+    cp -r $DIR/cli-test-main/bin $DIR/bin
+    cp $DIR/cli-test-main/rakpios-cli $DIR/
+    rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
+    # add the rakpios-cli diretory to the PATH
     echo "export PATH=$DIR/bin:$PATH">>~/.bashrc
     source ~/.bashrc
     # echo "rakpios-cli successfully installed!"
@@ -101,4 +116,3 @@ do_fresh_install(){
 }
 
 main "$@" || exit 1
-

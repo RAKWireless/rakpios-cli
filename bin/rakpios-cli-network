@@ -2,8 +2,8 @@
 
 do_configure_dhcp()
 {
-	FILE="/etc/NetworkManager/system-connections/eth0.nmconnection"
-
+	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
+    echo "$FILE"
 	if (whiptail --yes-button "Enable" --no-button "Cancle"  --yesno "Enable your configuration?" 10 60) then
 
 		if [ -e $FILE ]; then
@@ -18,7 +18,7 @@ do_configure_dhcp()
 do_configure_static()
 {
 
-	FILE="/etc/NetworkManager/system-connections/eth0.nmconnection"
+	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
 
 	IP=$(whiptail --inputbox "input IP address/prefix" 10 60 "192.168.240.100/24" --title "IP address" 3>&1 1>&2 2>&3)
 	GW=$(whiptail --inputbox "input Gateway address" 10 60 "192.168.240.1" --title "gateway address" 3>&1 1>&2 2>&3)
@@ -28,7 +28,7 @@ do_configure_static()
 		if [ -e $FILE ]; then
 			nmcli connection modify filename $FILE ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual
 		else
-			nmcli connection add con-name eth0 ifname eth0 type ethernet ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual			
+			nmcli connection add con-name $1 ifname $1 type ethernet ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual			
 		fi
 		nmcli connection up filename $FILE
 	else
@@ -38,10 +38,12 @@ do_configure_static()
 
 do_configure_ethernet()
 {
-	#IFACES=$(cat /proc/net/dev | tail -n+3 | cut -d ":" -f1 | sed 's/ //g' | grep -E '^eth|^en')
-	IFACE=$(whiptail --title " CONFIGURE ETHERNET" --menu "Selecet Interface:" 15 60 4 \
-                "<1>" "eth0"\
-                "<2>" "eth1" \
+	IFACES=$(cat /proc/net/dev | tail -n+3 | cut -d ":" -f1 | sed 's/ //g' | grep -E '^eth|^en')
+    while read -r line; do
+        iface_list+=("$line" "$line")
+    done <<< "$IFACES"
+
+	IFACE=$(whiptail --notags --title " CONFIGURE ETHERNET" --menu "Selecet Interface:" 15 60 4 ${iface_list[@]}\
                 3>&1 1>&2 2>&3)
     RET=$?
 	
@@ -71,12 +73,12 @@ do_wifi_ap()
 {
 	SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
 	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
-	FILE="/etc/NetworkManager/system-connections/wlan0.nmconnection"
+	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
 	if (whiptail --yes-button "Enable" --no-button "Cancle"  --yesno "Enable your configuration?" 10 60) then
 		if [ -e $FILE ]; then
 			nmcli connection modify filename $FILE wifi.mode ap wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
 		else
-			nmcli connection add con-name wlan0 type wifi ssid $SSID mode ap 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
+			nmcli connection add con-name $1 type wifi ssid $SSID mode ap 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
 		fi
 		nmcli connection up filename $FILE
 	else
@@ -95,10 +97,12 @@ do_wifi_sta()
 	elif [ $RET -eq 0 ]; then
     	case "$FUN" in
 			1)
-			#value=$(sudo nmcli device wifi list | tail -n +2 | awk '{print $2"/"$9" "$10}' | tr '\t' '/' | tr '\n' '/' | tr '-' 'a')
-			#vaule=$value"\n"
-			#IFS="/"
-    		SSID=$(whiptail --menu "Scan List:" 15 60 4 "RAK" "WPA WPA2" "Test-5G" "WPA3" 3>&1 1>&2 2>&3)
+            SSID_LIST=$(nmcli device wifi list | tail -n +2 | awk '{print $2}')
+            while read -r line; do
+        		ssid_list+=("$line" "$line")
+    		done <<< "$SSID_LIST"
+
+    		SSID=$(whiptail --notags --menu "Scan List:" 15 60 4 ${ssid_list[@]} 3>&1 1>&2 2>&3)
 			;;
 			2)
 			SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
@@ -107,13 +111,14 @@ do_wifi_sta()
 	fi
 
 	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
-	FILE="/etc/NetworkManager/system-connections/wlan0.nmconnection"	
+	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
+   
 	if (whiptail --yes-button "Enable" --no-button "Cancle"  --yesno "Enable your configuration?" 10 60) then
 
         if [ -e $FILE ]; then
             nmcli connection modify filename $FILE wifi.mode '' wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method auto ipv4.addresses '' 
 		else
-			nmcli connection add con-name wlan0 type wifi ssid $SSID 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD			
+			nmcli connection add con-name $1 type wifi ssid $SSID 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD			
         fi
 		nmcli connection up filename $FILE
     else
@@ -123,10 +128,15 @@ do_wifi_sta()
 
 do_configure_wifi()
 {
-	IFACE=$(whiptail --title " CONFIGURE ETHERNET" --menu "Selecet Interface:" 15 60 4 \
-                "<1>" "wlan0"\
+    IFACES=$(cat /proc/net/dev | tail -n+3 | cut -d ":" -f1 | sed 's/ //g' | grep -E '^wl')
+    while read -r line; do
+        iface_list+=("$line" "$line")
+    done <<< "$IFACES"
+
+	IFACE=$(whiptail --notags --title " CONFIGURE WiFi" --menu "Selecet Interface:" 15 60 4 ${iface_list[@]}\
                 3>&1 1>&2 2>&3)
-    RET=$?
+
+	RET=$?
 
     if [ $RET -eq 1 ]; then
                 clear
@@ -134,7 +144,7 @@ do_configure_wifi()
     elif [ $RET -eq 0 ]; then
 
 
-		FUN=$(whiptail --title "Configire WiFi" --menu "Select WiFi mode:" 15 60 4 \
+		FUN=$(whiptail --title "Configure WiFi" --menu "Select WiFi mode:" 15 60 4 \
                 1 "AP mode" \
                 2 "STA mode" \
                 3>&1 1>&2 2>&3)
@@ -182,7 +192,7 @@ do_configure_lte()
 	
 }
 
-do_network_main_menu()
+do_main_menu()
 {
 	FUN=$(whiptail --title "RAKPiSO NETWORK CONFIG v1.0" --menu "Configuration options:" 15 60 4 \
                 1 "Configure Ethernet" \
@@ -204,9 +214,9 @@ do_network_main_menu()
 
 }
 
-# if [ $(id -u) -ne 0 ]; then
-#   printf "Script must be run as root. Try 'sudo ./whiptail_network_config'\n"
-#   exit 1
-# fi
+if [ $(id -u) -ne 0 ]; then
+	printf "Script must be run as root. Try 'sudo ./whiptail_network_config'\n"
+  	exit 1
+fi
 
-# do_network_main_menu
+do_main_menu

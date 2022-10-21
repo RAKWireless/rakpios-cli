@@ -6,7 +6,7 @@
 # set -u
 
 source ./bin/portainer_json_parser
-source ./bin/rakpios-cli-network
+source ./bin/rakpios-cli-network  
 source ./bin/rakpios-cli-udp
 
 do_main_menu(){
@@ -17,7 +17,7 @@ do_main_menu(){
             network)
               do_network_main_menu
               ;;
-
+        
             container)
               do_check_docker_basic
               do_container
@@ -26,21 +26,71 @@ do_main_menu(){
             update)
               whiptail --msgbox --title "Update the RAKPiOS CLI tool" "To do..." 25 80
               ;;
-
+        
             *)
             echo -n "unknown"
             ;;
         esac
-    do_main_menu
+    do_main_menu      
     else
         echo "User selected Cancel."
         exit 0
     fi
 }
 
+# update notification script
+do_update_notification(){
+    VERSION_PATTERN=^v[0-99].[0-99]
+    # will change the URL to the json file stored in the portainer repo before release
+    REMOTE_VERSION_URL_portainer_json="https://raw.githubusercontent.com/Sheng2216/cli-test/main/portainer_app_template.json"
+    LOCAL_VERSION_PATH="./portainer_app_template.json"
+
+    # maybe we can improve this approach?
+    REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sheng2216/cli-test/main/version.json"
+    LOCAL_VERSION_PATH="./version"
+
+    remote_version_portainer_json=$(curl -s $REMOTE_VERSION_URL_portainer_json | jq '.version_for_rakpios_cli' | tr -d '"')
+    local_version_portainer_json=$(jq '.version_for_rakpios_cli' ./portainer_app_template.json | tr -d '"')
+
+    remote_version_rakpios_cli=$(curl -s $REMOTE_VERSION_URL)
+    local_version_rakpios_cli=$(cat $LOCAL_VERSION_PATH)
+
+    # echo $remote_version_portainer_json
+    # echo $local_version_portainer_json
+
+    # echo $remote_version_rakpios_cli
+    # echo $local_version_rakpios_cli
+
+    if  [[ ! $remote_version_portainer_json =~ $VERSION_PATTERN ]] || [[ ! $local_version_portainer_json =~ $VERSION_PATTERN ]] || [[ ! $remote_version_rakpios_cli =~ $VERSION_PATTERN ]] || [[ ! $local_version_rakpios_cli =~ $VERSION_PATTERN ]]; then
+        whiptail --title "Error" --msgbox  "Check updates failed, please check your network connection and make sure the RAKPiOS-CLI is unmodified." 10 78
+        # exit 1
+    fi
+    # check updates for sportainer_json
+    if [[ $remote_version_portainer_json > $local_version_portainer_json ]]; then
+        if (whiptail --title "Update protainer json file" --yesno "An portainer json file update is available, do you want to update it?" 8 78); then
+            echo "User selected Yes, exit status was $?."
+            do_portainer_json_update
+        else
+            echo "User selected not to update portainer json."
+        fi
+    fi
+
+    # check updates for rakpios-cli
+    if [[ $remote_version_rakpios_cli > $local_version_rakpios_cli ]]; then
+        if (whiptail --title "Update rakpios-cli" --yesno "An update for RAKPiOS-CLI is available, do you want to update it?" 8 78); then
+            echo "User selected Yes, exit status was $?."
+            do_rakpios_cli_update
+        else
+            echo "User selected not to update RAKPiOS-CLI."
+        fi
+    fi
+}
+
+###################################################################################################
+
 if [ $(id -u) -ne 0 ]; then
-  printf "Script must be run as root. Try 'sudo ./rakpios-cli'\n"
+  printf "Script must be run as root. Try 'sudo ./whiptail_network_config'\n"
   exit 1
 fi
-
+do_update_notification
 do_main_menu
