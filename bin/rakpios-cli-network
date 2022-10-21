@@ -192,7 +192,7 @@ do_configure_lte()
 	
 }
 
-do_main_menu()
+do_network_main_menu()
 {
 	FUN=$(whiptail --title "RAKPiSO NETWORK CONFIG v1.0" --menu "Configuration options:" 15 60 4 \
                 1 "Configure Ethernet" \
@@ -214,9 +214,9 @@ do_main_menu()
 
 }
 
-if [ $(id -u) -ne 0 ]; then
-	printf "Script must be run as root. Try 'sudo ./whiptail_network_config'\n"
-  	exit 1
-fi
+# if [ $(id -u) -ne 0 ]; then
+# 	printf "Script must be run as root. Try 'sudo ./whiptail_network_config'\n"
+#   	exit 1
+# fi
 
-do_main_menu
+# do_main_menu

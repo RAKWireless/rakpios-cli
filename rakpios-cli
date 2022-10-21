@@ -4,12 +4,12 @@
 # set -o nounset
 # set -o pipefail
 # set -u
-set -e
+# set -e
 
 
-source ./bin/portainer_json_parser
-source ./bin/rakpios-cli-network  
-source ./bin/rakpios-cli-udp
+source /bin/.rakpios-cli/bin/portainer-json-parser
+source /bin/.rakpios-cli/bin/rakpios-cli-network
+source /bin/.rakpios-cli/bin/rakpios-cli-udp
 
 do_main_menu(){
     main_menu_option=$(whiptail --notags --title "RAKPiOS CLI" --menu "choose your option" 20 78 8 "network" "Manage the network" "container" "Deploy docker containers" "update" "Update the RAKPiOS CLI tool" 3>&1 1>&2 2>&3)
@@ -19,7 +19,7 @@ do_main_menu(){
             network)
               do_network_main_menu
               ;;
-        
+
             container)
               do_check_docker_basic
               do_container
@@ -28,12 +28,12 @@ do_main_menu(){
             update)
               whiptail --msgbox --title "Update the RAKPiOS CLI tool" "To do..." 25 80
               ;;
-        
+
             *)
-            echo -n "unknown"
-            ;;
+              echo -n "unknown"
+              ;;
         esac
-    do_main_menu      
+    do_main_menu
     else
         echo "User selected Cancel."
         exit 0
@@ -91,7 +91,7 @@ do_update_notification(){
 ###################################################################################################
 
 if [ $(id -u) -ne 0 ]; then
-  printf "Script must be run as root. Try 'sudo ./whiptail_network_config'\n"
+  printf "Script must be run as root. Try 'sudo rakpios-cli'\n"
   exit 1
 fi
 do_update_notification

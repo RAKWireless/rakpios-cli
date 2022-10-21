@@ -4,7 +4,8 @@
 # set -o nounset
 # set -o pipefail
 # set -u
-set -e
+
+# set -e
 
 # the script needs privileged access to run
 if [ $(id -u) -ne 0 ]; then
@@ -76,8 +77,7 @@ do_check_install_status(){
     else
         do_fresh_install
         # echo "rakpios-cli successfully installed!"
-        whiptail --msgbox "rakpios-cli successfully upgraded!" 10 60
-        exit 0
+        whiptail --msgbox "rakpios-cli successfully installed!" 10 60
     fi 
 }
 
@@ -89,7 +89,7 @@ do_upgrade(){
     # remove the directory
     rm -rf $DIR
     # deleate the configuration saved in the bashrc
-    awk '!/rakpios-cli/' ~/.bashrc > tmpfile && mv tmpfile ~/.bashrc
+    awk '!/rakpios-cli/' /etc/profile > tmpfile && mv tmpfile /etc/profile
     # install the latest rakpios-cli
     do_fresh_install
     whiptail --msgbox "rakpios-cli successfully updated to the latest version!" 10 60
@@ -106,16 +106,14 @@ do_fresh_install(){
     cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
     cp -r $DIR/portainer-templates-master/Stack/ $DIR
     rm -rf $DIR/files.zip $DIR/portainer-templates-master/
-    
-    echo "done"
     # download the scripts from the rakpios-cli repo 
     curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     cp -r $DIR/cli-test-main/bin $DIR/bin
     cp $DIR/cli-test-main/rakpios-cli $DIR/
     rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
     # add the rakpios-cli diretory to the PATH
-    echo "export PATH=$DIR/bin:$PATH">>~/.bashrc
-    source ~/.bashrc
+    echo "PATH=$DIR:$PATH">>/etc/profile
+    source /etc/profile
 }
 
 main "$@" || exit 1
