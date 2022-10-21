@@ -7,7 +7,7 @@
 
 source ./bin/portainer_json_parser
 source ./bin/rakpios-cli-network
-#source ./bin/rakpios-cli-udp
+source ./bin/rakpios-cli-udp
 
 do_main_menu(){
     main_menu_option=$(whiptail --notags --title "RAKPiOS CLI" --menu "choose your option" 20 78 8 "network" "Manage the network" "container" "Deploy docker containers" "update" "Update the RAKPiOS CLI tool" 3>&1 1>&2 2>&3)
