@@ -4,6 +4,7 @@
 # set -o nounset
 # set -o pipefail
 # set -u
+set -e
 
 # the script needs privileged access to run
 if [ $(id -u) -ne 0 ]; then
@@ -74,6 +75,8 @@ do_check_install_status(){
         fi    
     else
         do_fresh_install
+        # echo "rakpios-cli successfully installed!"
+        whiptail --msgbox "rakpios-cli successfully upgraded!" 10 60
         exit 0
     fi 
 }
@@ -89,12 +92,14 @@ do_upgrade(){
     awk '!/rakpios-cli/' ~/.bashrc > tmpfile && mv tmpfile ~/.bashrc
     # install the latest rakpios-cli
     do_fresh_install
+    whiptail --msgbox "rakpios-cli successfully updated to the latest version!" 10 60
     exit 0
 }
 
 do_fresh_install(){
     # print install location
     do_print_install_location
+    mkdir $DIR
     
     # download the portainer app template and Stack file from portainer-template repo
     curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
@@ -111,8 +116,6 @@ do_fresh_install(){
     # add the rakpios-cli diretory to the PATH
     echo "export PATH=$DIR/bin:$PATH">>~/.bashrc
     source ~/.bashrc
-    # echo "rakpios-cli successfully installed!"
-    whiptail --msgbox "rakpios-cli successfully installed!" 10 60
 }
 
 main "$@" || exit 1

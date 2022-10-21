@@ -4,6 +4,8 @@
 # set -o nounset
 # set -o pipefail
 # set -u
+set -e
+
 
 source ./bin/portainer_json_parser
 source ./bin/rakpios-cli-network  
