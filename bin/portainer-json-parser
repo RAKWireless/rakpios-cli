@@ -17,19 +17,135 @@ do_select_service(){
         services_list_array+=("$line" "$line")
     done <<< "$portainer_services"
     # display whiptail menu listing out available services
-    service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "${services_list_array[@]}" 3>&1 1>&2 2>&3) 
+    # service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "portainer" "Portainer" "${services_list_array[@]}" 3>&1 1>&2 2>&3)
+    service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "${services_list_array[@]}" 3>&1 1>&2 2>&3)  
     exitstatus=$?
         if [ $exitstatus = 0 ]; then
             echo "The chosen service is:" $service_to_start
-            # if [ -z "$env_full_list" ]; then
-            #     do_env_variable_concat
-            # fi
+            # the Portainer's template is not in the .json file, so no need to parse the json for Portainer
+            if [[ $service_to_start == "portainer" ]] ; then 
+                do_portainer
+            else
             do_env_variable_concat
             do_pre_up_options
+            fi
         else
             echo "User selected quit."
             exit 0
         fi
+}
+
+do_portainer(){
+    pre_up_options=$(whiptail --notags --title "Bring up Portainer" --menu "options" 20 78 8 "configure" "Configure environment variables" "start" "Start the service" 3>&1 1>&2 2>&3)
+    exitstatus=$?
+    if [ $exitstatus = 0 ]; then
+        if [ $pre_up_options == "start" ]; then
+            do_portainer_up
+        else
+            do_portainer_configure
+        fi
+    else
+        echo "User selected Cancel."
+        do_container
+    fi
+}
+
+do_portainer_configure(){
+    variable=$(whiptail --notags --title "Variables" --ok-button "Change" --cancel-button "Save and exit" --menu "Configure variables" 20 100 10  \
+    "version" "Portainer CE version" \
+    "url" "Portainer template URL" \
+    "password" "Portainer web interface password" 3>&1 1>&2 2>&3)
+    exitstatus=$?
+    if [ $exitstatus = 0 ]; then
+        echo "The chosen variable is:" $variable
+        case $variable in
+          "version")
+            portainer_version=2.15.0
+            portainer_version=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${portainer_version}" 3>&1 1>&2 2>&3) 
+            if [ $exitstatus != 0 ]; then
+                echo "User selected Cancel."
+                do_portainer_configure
+            # else
+            #     do_get_modified_env_list
+            fi
+            ;;
+          "url")
+            portainer_url=https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json
+            portainer_url=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${portainer_url}" 3>&1 1>&2 2>&3) 
+            if [ $exitstatus != 0 ]; then
+                echo "User selected Cancel."
+                do_portainer_configure
+            fi
+            ;;
+          "password")
+            portainer_password=\$2y\$05\$CamDlWaqdhRQvy1AuOZlY.4QYi/GptU6lDruXD0YiYiwQljGJmamC
+            portainer_password=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${portainer_password}" 3>&1 1>&2 2>&3) 
+            if [ $exitstatus != 0 ]; then
+                echo "User selected Cancel."
+                do_portainer_configure
+            fi
+            ;;
+        esac        
+    else
+        echo "User selected Cancel. Return the pre-up menu. "
+    fi
+}
+
+do_portainer_up(){
+    if [[ $(docker container ls -af name=portainer --format true) ]]; then
+      docker start portainer
+      portainer_docker_id=${docker ps -aqf "name=portainer"}
+      echo "Start the portainer container $portainer_docker_id"
+      do_portainer_ip
+   else
+      docker run -d -p 8000:8000 -p 9443:9443 --name=portainer --restart=unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:$portainer_version --admin-password=$portainer_password --templates $portainer_template_url
+      if [ $? -ne 0 ]; then
+         echo "Portainer deployed failed, please double check the virables and error logs"
+      else
+         portainer_docker_id=`docker ps -aqf "name=/portainer"`
+         echo "Portainer deployed, portainer image version: portainer-ce:$portainer_version"
+         echo "container id: $portainer_docker_id"
+         echo "app template url: $portainer_template_url"
+         do_portainer_ip
+         echo -e $W"Default username: "$Y"admin"
+         echo -e $W"Default password: "$Y"changeme"
+      fi
+   fi
+}
+
+do_portainer_ip(){
+    if [[ ! -z "${SSH_CONNECTION}" ]]; then
+      portainer_ip=`echo $SSH_CONNECTION | awk '{print $3}'`
+      portainer_url=`echo "https://"$portainer_ip":9443"`
+      echo -e $W"Portainer server address is "$Y$portainer_url;
+   else
+      # Get IP addresses
+      SHOW_IP_PATTERN="^bond.*|^[ewr].*|^br.*|^lt.*|^umts.*|^lan.*"
+      ips=()
+      docker_br_intf=`docker network ls -f driver=bridge --format "br-{{.ID}}"`  #docker bridge network interface
+      for f in /sys/class/net/*; do
+         intf=$(basename $f)
+         # match only interface names starting with e (Ethernet), br (bridge), w (wireless), r (some Ralink drivers use>
+         # and get rid of bridge interface created by docker
+         if ([[ $intf =~ $SHOW_IP_PATTERN ]] && !([[ $docker_br_intf =~ $intf ]])) then
+            tmp=$(ip -4 addr show dev $intf | awk '/inet/ {print $2}' | cut -d'/' -f1)
+            # add both name and IP - can be informative but becomes ugly with long persistent/predictable device names
+            #[[ -n $tmp ]] && ips+=("$intf: $tmp")
+            # add IP only
+            [[ -n $tmp ]] && ips+=("$tmp")
+         fi 
+      done
+      IP=${ips[@]}
+      echo "Browse to the following URL(s) to access your Portainer Server"
+      for ((i=1; i<=`wc -w <<< "$IP"`;i++));
+      do
+         portainer_ip=`echo $IP | awk -v i="$i" '{print $i}'`
+         portainer_url=`echo "https://"$portainer_ip":9443"`
+         echo -e $W"Portainer server address: "$Y$portainer_url;
+      done 
+   fi
+
+
 }
 
 # function that read all the env variables of a service from the .json file and concat them

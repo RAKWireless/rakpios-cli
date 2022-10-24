@@ -33,6 +33,14 @@ EOF
 DIR="/bin/.rakpios-cli"
 
 main(){
+    # check for necessary tools
+    need_cmd curl
+    need_cmd jq
+    need_cmd unzip
+    need_cmd whiptail
+    need_cmd network-manager
+    # docker will be checkd separately
+
     SHORT=i,u,h
     LONG=install,upgrade,help
     OPTS=$(getopt --options $SHORT --longoptions $LONG -- "$@")
@@ -176,8 +184,24 @@ do_rakpios_cli_menu(){
     fi
 }
 
+# function to install command if not installed before
+need_cmd() {
+    if ! check_cmd "$1"; then
+        echo "need '$1' (command not found)"
+        apt install $1 -y
+    fi
+}
+# function to check whether command is installed or not
+check_cmd() {
+    if [[ $1 == "network-manager" ]] ; then
+        command -v nmcli > /dev/null 2>&1
+    else
+        command -v "$1" > /dev/null 2>&1
+    fi
+}
+
 # update notification script
-do_update_notification(){
+do_update_notification(){ 
     VERSION_PATTERN=^v[0-99].[0-99]
     # will change the URL to the json file stored in the portainer repo before release
     REMOTE_VERSION_URL_portainer_json="https://raw.githubusercontent.com/Sheng2216/cli-test/main/portainer_app_template.json"
