@@ -248,6 +248,20 @@ do_update_notification(){
     fi
 }
 
+do_portainer_json_update(){
+    curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
+    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
+    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+}
+
+do_rakpios_cli_update(){
+    curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
+    cp -r $DIR/cli-test-main/bin $DIR/bin
+    cp $DIR/cli-test-main/rakpios-cli $DIR/
+    cp $DIR/cli-test-main/version $DIR/
+    rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
+}
+
 do_print_install_location(){
     echo "The rakpios-cli will be installed in the ${DIR}"
 }
