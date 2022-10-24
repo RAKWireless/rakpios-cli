@@ -4,14 +4,143 @@
 # set -o nounset
 # set -o pipefail
 # set -u
+
 # set -e
 
+source ./bin/portainer-json-parser
+source ./bin/rakpios-cli-network
 
-source /bin/.rakpios-cli/bin/portainer-json-parser
-source /bin/.rakpios-cli/bin/rakpios-cli-network
-source /bin/.rakpios-cli/bin/rakpios-cli-udp
+# the script needs privileged access to run
+if [ $(id -u) -ne 0 ]; then
+  printf "Script must be run as root. Try 'sudo rakpios-cli'\n"
+  exit 1
+fi
 
-do_main_menu(){
+# usage information
+usage() {
+    cat 1>&2 <<EOF
+rakpios-cli-install 0.0.1 (hash 2022-10-10)
+The installer for rakpios-cli
+USAGE:
+    rakpios-cli-install [FLAGS]
+FLAGS:
+    -i, --install           Install rakpios-cli
+    -u, --upgrade           Upgrade rakpios-cli
+    -h, --help              Prints help information
+EOF
+}
+
+DIR="/bin/.rakpios-cli"
+
+main(){
+    SHORT=i,u,h
+    LONG=install,upgrade,help
+    OPTS=$(getopt --options $SHORT --longoptions $LONG -- "$@")
+
+    if [ $? -ne 0 ]; then
+        usage
+        exit 0
+    fi
+    
+    eval set -- "$OPTS"
+    
+    while :
+    do
+        case $1 in
+            -h | --help) # display Usage information
+                usage
+                exit 0
+                ;;
+            -i | --install) # Install rakpios-cli
+                do_check_install_status
+                exit 0
+                ;;
+            -u | --upgrade) # Upgrade rakpios-cli
+                do_upgrade
+                exit 0
+                ;;            
+            *)
+                # echo "invalid command: $1"
+                # usage
+                break
+                ;;
+        esac
+    done
+    
+    if (( $OPTIND == 1 )); then
+        do_update_notification
+        do_rakpios_cli_menu
+    fi
+
+}
+
+do_check_install_status(){
+    if [ -d "$DIR" ]; then
+        whiptail --title "Confirmation" --yesno "Looks like rakpios-cli is already installed in "$DIR" \nDo you want to upgrade the rakpios-cli to the latest version?" 10 78 --yes-button "Yes" --no-button "No" 
+        if [[ $? -eq 0 ]]; then 
+            do_upgrade
+        elif [[ $? -eq 1 ]]; then 
+            exit 0
+        fi    
+    else
+        do_fresh_install
+        # echo "rakpios-cli successfully installed!"
+        whiptail --msgbox "rakpios-cli successfully installed!" 10 60
+    fi 
+}
+
+do_print_install_location(){
+    echo "The rakpios-cli will be installed in the ${DIR}"
+}
+
+do_clean_up(){
+    # remove the directory
+    rm -rf $DIR
+    # deleate the configuration saved in the bashrc
+    awk '!/rakpios-cli/' /etc/profile > tmpfile && mv tmpfile /etc/profile
+}
+
+do_upgrade(){
+    do_clean_up
+    # install the latest rakpios-cli
+    do_fresh_install
+    whiptail --msgbox "rakpios-cli successfully updated to the latest version!" 10 60
+    exit 0
+}
+
+do_fresh_install(){
+    # print install location
+    do_clean_up
+    do_print_install_location
+    mkdir $DIR
+    # download the portainer app template and Stack file from portainer-template repo
+    curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
+    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
+    cp -r $DIR/portainer-templates-master/Stack/ $DIR
+    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+    # download the scripts from the rakpios-cli repo 
+    curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
+    cp -r $DIR/cli-test-main/bin $DIR/bin
+    cp $DIR/cli-test-main/rakpios-cli $DIR/
+    rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
+    # add the rakpios-cli diretory to the PATH
+    echo "PATH=$DIR:$PATH">>/etc/profile
+    source /etc/profile
+}
+
+do_check_docker_basic(){
+    if [ -x "$(command -v docker)" ]; then
+        if docker info --format '{{json .}}' | grep "permission denied"; then
+        whiptail --msgbox "Got permission denied while trying to connect to the Docker daemon socket. Please make sure the current user has the right premission." 10 60
+        exit 1
+        fi  
+    else
+        whiptail --msgbox "Docker not install, please install docker first" 20 60
+        exit 1
+    fi
+}
+
+do_rakpios_cli_menu(){
     main_menu_option=$(whiptail --notags --title "RAKPiOS CLI" --menu "choose your option" 20 78 8 "network" "Manage the network" "container" "Deploy docker containers" "update" "Update the RAKPiOS CLI tool" 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
@@ -26,14 +155,21 @@ do_main_menu(){
               ;;
 
             update)
-              whiptail --msgbox --title "Update the RAKPiOS CLI tool" "To do..." 25 80
+              if (whiptail --title "Confirmation" --yesno "Do you want to update the RAKPiOS CLI tool ?" 8 78); then
+                  echo "User selected Yes."
+                  do_fresh_install
+                  whiptail --msgbox --title "Update completed" "Update completed..." 25 80
+                  exit 0
+              else
+                  echo "User selected No."
+              fi
               ;;
 
             *)
               echo -n "unknown"
               ;;
         esac
-    do_main_menu
+    do_rakpios_cli_menu
     else
         echo "User selected Cancel."
         exit 0
@@ -88,11 +224,31 @@ do_update_notification(){
     fi
 }
 
+do_print_install_location(){
+    echo "The rakpios-cli will be installed in the ${DIR}"
+}
+
+do_fresh_install(){
+    # print install location
+    do_print_install_location
+    mkdir $DIR
+    
+    # download the portainer app template and Stack file from portainer-template repo
+    curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
+    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
+    cp -r $DIR/portainer-templates-master/Stack/ $DIR
+    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+    # download the scripts from the rakpios-cli repo 
+    curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
+    cp -r $DIR/cli-test-main/bin $DIR/bin
+    cp $DIR/cli-test-main/rakpios-cli $DIR/
+    rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
+    # add the rakpios-cli diretory to the PATH
+    echo "PATH=$DIR:$PATH">>/etc/profile
+    source /etc/profile
+}
+
 ###################################################################################################
 
-if [ $(id -u) -ne 0 ]; then
-  printf "Script must be run as root. Try 'sudo rakpios-cli'\n"
-  exit 1
-fi
-do_update_notification
-do_main_menu
+
+main "$@" || exit 1

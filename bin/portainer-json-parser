@@ -17,13 +17,14 @@ do_select_service(){
         services_list_array+=("$line" "$line")
     done <<< "$portainer_services"
     # display whiptail menu listing out available services
-    service_to_start=$(whiptail --notags --title "Services" --menu "Select Services" 20 100 10 "${services_list_array[@]}" 3>&1 1>&2 2>&3) 
+    service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "${services_list_array[@]}" 3>&1 1>&2 2>&3) 
     exitstatus=$?
         if [ $exitstatus = 0 ]; then
             echo "The chosen service is:" $service_to_start
-            if [ -z "$env_full_list" ]; then
-                do_env_variable_concat
-            fi
+            # if [ -z "$env_full_list" ]; then
+            #     do_env_variable_concat
+            # fi
+            do_env_variable_concat
             do_pre_up_options
         else
             echo "User selected quit."
@@ -47,7 +48,7 @@ do_env_variable_concat(){
         done
     )
     env_full_list=$(echo ${env_full_list})
-    # echo "The original env varialbe list:${env_full_list}"
+    echo "The original env varialbe list:${env_full_list}"
 }
 
 # function that read the env variable label to change from user input 
@@ -58,14 +59,14 @@ do_choose_service_env(){
         service_env_array+=("$line" "$line")
     done <<< "$service_env"
     # display whiptail menu listing out available services
-    env_label_to_configure=$(whiptail --notags --title "Variables" --menu "Configure variables" 20 100 10 "${service_env_array[@]}" 3>&1 1>&2 2>&3) 
+    env_label_to_configure=$(whiptail --notags --title "Variables" --ok-button "Change" --cancel-button "Save and exit" --menu "Configure variables" 20 100 10 "${service_env_array[@]}" 3>&1 1>&2 2>&3) 
     exitstatus=$?
         if [ $exitstatus = 0 ]; then
             echo "The chosen variable is:" $env_label_to_configure
             do_change_service_env
         else
-            echo "User selected Cancel. Return to main menu."
-            do_container
+            echo "User selected Cancel. Return to pre-up menu."
+            do_pre_up_options
         fi
 }
 
@@ -99,6 +100,8 @@ do_change_service_env(){
         if [ $exitstatus != 0 ]; then
             echo "User selected Cancel."
             do_choose_service_env
+        else
+            do_get_modified_env_list
         fi
     else
         # echo "no options" 
@@ -107,24 +110,26 @@ do_change_service_env(){
         if [ $exitstatus != 0 ]; then
             echo "User selected Cancel."
             do_choose_service_env
+        else
+            do_get_modified_env_list
         fi   
     fi
+}
+
+do_get_modified_env_list(){
     # echo "The changing variable label is:${env_label_to_configure}" 
     env_name_to_configure=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | .name ' ./portainer_app_template.json | tr -d '"')
-    # echo "The changing variable name is:${env_name_to_configure}" 
-    # echo "and it need to be changed to ${value_changed_to_text}"
     new_env_pair=$(echo "${env_name_to_configure}=${value_changed_to_text}")
     echo "new env pair: ${new_env_pair}"
-    # echo "before modified env full list is ${env_full_list}" 
-    # use a different delimiters in sed to ger rid of the slash issue
+    # use a different delimiters # in sed to ger rid of the slash issue
     env_full_list=$(echo ${env_full_list} | sed "s#${env_name_to_configure}*\S*#${new_env_pair}#")
-    echo "modified env full list is: ${env_full_list}" 
-   
-    do_pre_up_options
+    echo "modified env full list is: ${env_full_list}"  
+    do_choose_service_env
+    # do_pre_up_options
 }
 
 do_pre_up_options(){
-    pre_up_options=$(whiptail --notags --title "Bring up the UDP packet forwarder" --menu "options" 20 78 8 "configure" "Configure environment variables" "start" "Start the service" 3>&1 1>&2 2>&3)
+    pre_up_options=$(whiptail --notags --title "Bring up ${service_to_start}" --menu "options" 20 78 8 "configure" "Configure environment variables" "start" "Start the service" 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
         if [ $pre_up_options == "start" ]; then
@@ -139,8 +144,8 @@ do_pre_up_options(){
 }
 
 do_ask_for_confirmation(){
-    if (whiptail --title "Deploy the service?" --yesno "Deploy the service" 8 78); then
-        echo "User selected to deploy the service."
+    if (whiptail --title "Confirmation" --yesno "Do you wan to deploy ${service_to_start}?" 8 78); then
+        echo "User selected to deploy ${service_to_start}."
         do_check_service_type
     else
         echo "User selected Cancel, exit to main menu."
@@ -156,6 +161,7 @@ do_check_service_type(){
     else
         do_docker_compose_up
     fi
+    unset 
 }
 
 do_get_basic_info(){
@@ -182,7 +188,6 @@ do_get_basic_info(){
     echo "container_network ${container_network}"
     # container hostname
     container_hostname=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .hostname' ./portainer_app_template.json | tr -d '"')
-    echo "before container_hostname ${container_hostname}"
     if [ "$container_hostname" != "null" ]; then
         container_hostname="-h ${container_hostname}"
     fi   
@@ -228,12 +233,20 @@ do_docker_compose_up(){
     docker_compose_command="${docker_compose_env_list} docker compose -f ${yml_file_path} up -d"
     echo $docker_compose_command
     eval $docker_compose_command
-    
 }
 
 do_print_post_up_info(){
     post_up_info="$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .post_up_info' ./portainer_app_template.json | tr -d '"')"
-    whiptail --title "Notes" --msgbox  "$post_up_info" 30 78 
+    if [[ $service_to_start == "LoRa Basics™ Station for Docker" ]] || [[ $service_to_start == "UDP Packet Forwarder" ]] || [[ $service_to_start == "2.4GHz Gateway UDP Packet Forwarder" ]]; then
+        container_name_raw=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .name' ./portainer_app_template.json | tr -d '"')
+        echo $container_name_raw
+        docker_container_id=$(docker ps -aqf name=${container_name_raw})
+        GATEWAY_EUI=$(docker exec -it ${container_name_raw} ./get_eui.sh | tr -cd  '[a-zA-Z][0-9]'|sed s/GatewayEUI//)
+        whiptail --title "Notes" --msgbox "Container id : $docker_container_id \nGateway EUI  : $GATEWAY_EUI \n \n$post_up_info" 30 78
+    else
+        whiptail --title "Notes" --msgbox  "$post_up_info" 30 78 
+    fi
+
 }
 
 do_container(){
@@ -242,7 +255,7 @@ do_container(){
 }
 
 # if [ $(id -u) -ne 0 ]; then
-#   printf "Script must be run as root. Try 'sudo ./main test'\n"
+#   printf "Script must be run as root. Try 'sudo ./portainer-json-parser'\n"
 #   exit 1
 # fi
 
