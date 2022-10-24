@@ -17,8 +17,8 @@ do_select_service(){
         services_list_array+=("$line" "$line")
     done <<< "$portainer_services"
     # display whiptail menu listing out available services
-    # service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "portainer" "Portainer" "${services_list_array[@]}" 3>&1 1>&2 2>&3)
-    service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "${services_list_array[@]}" 3>&1 1>&2 2>&3)  
+    service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "portainer" "Portainer" "${services_list_array[@]}" 3>&1 1>&2 2>&3)
+    #service_to_start=$(whiptail --notags --title "Services" --cancel-button "Quit" --menu "Select Services" 20 100 10 "${services_list_array[@]}" 3>&1 1>&2 2>&3)  
     exitstatus=$?
         if [ $exitstatus = 0 ]; then
             echo "The chosen service is:" $service_to_start
@@ -36,6 +36,11 @@ do_select_service(){
 }
 
 do_portainer(){
+    #default variables for portainer service
+    portainer_version=2.15.0
+    portainer_url=https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json
+    portainer_password=\$2y\$05\$CamDlWaqdhRQvy1AuOZlY.4QYi/GptU6lDruXD0YiYiwQljGJmamC
+
     pre_up_options=$(whiptail --notags --title "Bring up Portainer" --menu "options" 20 78 8 "configure" "Configure environment variables" "start" "Start the service" 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
@@ -59,32 +64,38 @@ do_portainer_configure(){
     if [ $exitstatus = 0 ]; then
         echo "The chosen variable is:" $variable
         case $variable in
-          "version")
-            portainer_version=2.15.0
-            portainer_version=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${portainer_version}" 3>&1 1>&2 2>&3) 
-            if [ $exitstatus != 0 ]; then
-                echo "User selected Cancel."
-                do_portainer_configure
-            # else
-            #     do_get_modified_env_list
-            fi
-            ;;
-          "url")
-            portainer_url=https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json
-            portainer_url=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${portainer_url}" 3>&1 1>&2 2>&3) 
-            if [ $exitstatus != 0 ]; then
-                echo "User selected Cancel."
-                do_portainer_configure
-            fi
-            ;;
-          "password")
-            portainer_password=\$2y\$05\$CamDlWaqdhRQvy1AuOZlY.4QYi/GptU6lDruXD0YiYiwQljGJmamC
-            portainer_password=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${portainer_password}" 3>&1 1>&2 2>&3) 
-            if [ $exitstatus != 0 ]; then
-                echo "User selected Cancel."
-                do_portainer_configure
-            fi
-            ;;
+            version)
+              echo "79845789467594375439857439857439853"
+              portainer_version=$(whiptail --title "Change variable" --inputbox "Portainer CE version" 20 100 "$portainer_version" 3>&1 1>&2 2>&3)
+              exitstatus=$?
+              if [ $exitstatus != 0 ]; then
+                  echo "User selected Cancel."
+                  do_portainer_configure
+              else
+                  do_portainer
+              fi
+              ;;
+            url)
+              echo "uuuuuuuuuuuu4375439857439857439853"
+              portainer_url=$(whiptail --title "Change variable" --inputbox "Portainer template URL" 20 100 "$portainer_url" 3>&1 1>&2 2>&3)
+              exitstatus=$?
+              if [ $exitstatus != 0 ]; then
+                  echo "User selected Cancel."
+                  do_portainer_configure
+              else
+                  do_portainer
+              fi
+              ;;
+            password)
+              echo "ppppppppppppppp75439857439857439853"
+              portainer_password=$(whiptail --title "Change variable" --inputbox "Portainer web interface password" 20 100 "$portainer_password" 3>&1 1>&2 2>&3) 
+              exitstatus=$?
+              if [ $exitstatus != 0 ]; then
+                  echo "User selected Cancel."
+                  do_portainer_configure
+              else
+                  do_portainer
+              fi
         esac        
     else
         echo "User selected Cancel. Return the pre-up menu. "
@@ -94,7 +105,7 @@ do_portainer_configure(){
 do_portainer_up(){
     if [[ $(docker container ls -af name=portainer --format true) ]]; then
       docker start portainer
-      portainer_docker_id=${docker ps -aqf "name=portainer"}
+      portainer_docker_id=`docker ps -aqf "name=portainer"`
       echo "Start the portainer container $portainer_docker_id"
       do_portainer_ip
    else
