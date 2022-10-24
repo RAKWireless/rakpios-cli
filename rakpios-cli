@@ -242,6 +242,7 @@ do_fresh_install(){
     curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     cp -r $DIR/cli-test-main/bin $DIR/bin
     cp $DIR/cli-test-main/rakpios-cli $DIR/
+    cp $DIR/cli-test-main/version $DIR/
     rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
     # add the rakpios-cli diretory to the PATH
     echo "PATH=$DIR:$PATH">>/etc/profile
