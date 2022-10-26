@@ -4,11 +4,12 @@
 # set -o nounset
 # set -o pipefail
 # set -u
-
 # set -e
 
-source ./bin/portainer-json-parser
-source ./bin/rakpios-cli-network
+DIR="/usr/local/bin/.rakpios-cli"
+
+source $DIR/bin/portainer-json-parser
+source $DIR/bin/rakpios-cli-network
 
 # the script needs privileged access to run
 if [ $(id -u) -ne 0 ]; then
@@ -30,7 +31,6 @@ FLAGS:
 EOF
 }
 
-DIR="/bin/.rakpios-cli"
 
 main(){
     # check for necessary tools
@@ -74,7 +74,7 @@ main(){
                 ;;
         esac
     done
-    
+    # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
         do_update_notification
         do_rakpios_cli_menu
@@ -104,8 +104,6 @@ do_print_install_location(){
 do_clean_up(){
     # remove the directory
     rm -rf $DIR
-    # deleate the configuration saved in the bashrc
-    awk '!/rakpios-cli/' /etc/profile > tmpfile && mv tmpfile /etc/profile
 }
 
 do_upgrade(){
@@ -129,11 +127,10 @@ do_fresh_install(){
     # download the scripts from the rakpios-cli repo 
     curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     cp -r $DIR/cli-test-main/bin $DIR/bin
-    cp $DIR/cli-test-main/rakpios-cli $DIR/
+    cp $DIR/cli-test-main/version $DIR/version
+    # Copy main script to the /bin directory
+    cp $DIR/cli-test-main/rakpios-cli /usr/local/bin/rakpios-cli
     rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
-    # add the rakpios-cli diretory to the PATH
-    echo "PATH=$DIR:$PATH">>/etc/profile
-    source /etc/profile
 }
 
 do_check_docker_basic(){
@@ -205,14 +202,14 @@ do_update_notification(){
     VERSION_PATTERN=^v[0-99].[0-99]
     # will change the URL to the json file stored in the portainer repo before release
     REMOTE_VERSION_URL_portainer_json="https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json"
-    LOCAL_VERSION_PATH="./portainer_app_template.json"
+    LOCAL_VERSION_PATH="$DIR/portainer_app_template.json"
 
     # maybe we can improve this approach?
     REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sheng2216/cli-test/main/version"
-    LOCAL_VERSION_PATH="./version"
+    LOCAL_VERSION_PATH="${DIR}/version"
 
     remote_version_portainer_json=$(curl -s $REMOTE_VERSION_URL_portainer_json | jq '.version_for_rakpios_cli' | tr -d '"')
-    local_version_portainer_json=$(jq '.version_for_rakpios_cli' ./portainer_app_template.json | tr -d '"')
+    local_version_portainer_json=$(jq '.version_for_rakpios_cli' ${DIR}/portainer_app_template.json | tr -d '"')
 
     remote_version_rakpios_cli=$(curl -s $REMOTE_VERSION_URL)
     local_version_rakpios_cli=$(cat $LOCAL_VERSION_PATH)
@@ -250,41 +247,21 @@ do_update_notification(){
 
 do_portainer_json_update(){
     curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
-    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
+    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR/portainer_app_template.json
     rm -rf $DIR/files.zip $DIR/portainer-templates-master/
 }
 
 do_rakpios_cli_update(){
     curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     cp -r $DIR/cli-test-main/bin $DIR/bin
-    cp $DIR/cli-test-main/rakpios-cli $DIR/
-    cp $DIR/cli-test-main/version $DIR/
+    cp $DIR/cli-test-main/version $DIR/version
+    # copy the new script to the /bin directory
+    cp $DIR/cli-test-main/rakpios-cli /bin/rakpios-cli
     rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
 }
 
 do_print_install_location(){
     echo "The rakpios-cli will be installed in the ${DIR}"
-}
-
-do_fresh_install(){
-    # print install location
-    do_print_install_location
-    mkdir $DIR
-    
-    # download the portainer app template and Stack file from portainer-template repo
-    curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
-    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
-    cp -r $DIR/portainer-templates-master/Stack/ $DIR
-    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
-    # download the scripts from the rakpios-cli repo 
-    curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
-    cp -r $DIR/cli-test-main/bin $DIR/bin
-    cp $DIR/cli-test-main/rakpios-cli $DIR/
-    cp $DIR/cli-test-main/version $DIR/
-    rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
-    # add the rakpios-cli diretory to the PATH
-    echo "PATH=$DIR:$PATH">>/etc/profile
-    source /etc/profile
 }
 
 ###################################################################################################
