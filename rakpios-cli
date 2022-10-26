@@ -8,8 +8,7 @@
 
 DIR="/usr/local/bin/.rakpios-cli"
 
-source $DIR/bin/portainer-json-parser
-source $DIR/bin/rakpios-cli-network
+
 
 # the script needs privileged access to run
 if [ $(id -u) -ne 0 ]; then
@@ -76,6 +75,8 @@ main(){
     done
     # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
+        source $DIR/bin/portainer-json-parser
+        source $DIR/bin/rakpios-cli-network
         do_update_notification
         do_rakpios_cli_menu
     fi
@@ -213,12 +214,6 @@ do_update_notification(){
 
     remote_version_rakpios_cli=$(curl -s $REMOTE_VERSION_URL)
     local_version_rakpios_cli=$(cat $LOCAL_VERSION_PATH)
-
-    # echo $remote_version_portainer_json
-    # echo $local_version_portainer_json
-
-    # echo $remote_version_rakpios_cli
-    # echo $local_version_rakpios_cli
 
     if  [[ ! $remote_version_portainer_json =~ $VERSION_PATTERN ]] || [[ ! $local_version_portainer_json =~ $VERSION_PATTERN ]] || [[ ! $remote_version_rakpios_cli =~ $VERSION_PATTERN ]] || [[ ! $local_version_rakpios_cli =~ $VERSION_PATTERN ]]; then
         whiptail --title "Error" --msgbox  "Check updates failed, please check your network connection and make sure the RAKPiOS-CLI is unmodified." 10 78
