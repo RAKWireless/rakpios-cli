@@ -6,15 +6,17 @@
 # set -u
 # set -e
 
-DIR="/usr/local/bin/.rakpios-cli"
-
-
+# DIR="/usr/local/bin/.rakpios-cli"
+DIR="${HOME}/.cache/rakpios-cli"
+bin_DIR="${HOME}/.local/bin"
+lib_DIR="${HOME}/.local/lib/rakpios-cli"
+config_DIR="${HOME}/.config/rakpios-cli"
 
 # the script needs privileged access to run
-if [ $(id -u) -ne 0 ]; then
-  printf "Script must be run as root. Try 'sudo rakpios-cli'\n"
-  exit 1
-fi
+# if [ $(id -u) -ne 0 ]; then
+#   printf "Script must be run as root. Try 'sudo rakpios-cli'\n"
+#   exit 1
+# fi
 
 # usage information
 usage() {
@@ -75,17 +77,16 @@ main(){
     done
     # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
-        source $DIR/bin/portainer-json-parser
-        source $DIR/bin/rakpios-cli-network
+        source $lib_DIR/portainer-json-parser
+        source $lib_DIR/rakpios-cli-network
         do_update_notification
         do_rakpios_cli_menu
     fi
-
 }
 
 do_check_install_status(){
-    if [ -d "$DIR" ]; then
-        whiptail --title "Confirmation" --yesno "Looks like rakpios-cli is already installed in "$DIR" \nDo you want to upgrade the rakpios-cli to the latest version?" 10 78 --yes-button "Yes" --no-button "No" 
+    if test -f "${bin_DIR}/rakpios-cli"; then
+        whiptail --title "Confirmation" --yesno "Looks like rakpios-cli is already installed. \nDo you want to upgrade the rakpios-cli to the latest version?" 10 78 --yes-button "Yes" --no-button "No" 
         if [[ $? -eq 0 ]]; then 
             do_upgrade
         elif [[ $? -eq 1 ]]; then 
@@ -99,12 +100,12 @@ do_check_install_status(){
 }
 
 do_print_install_location(){
-    echo "The rakpios-cli will be installed in the ${DIR}"
+    echo "The rakpios-cli will be installed in the ${bin_DIR},${lib_DIR},and ${config_DIR}"
 }
 
 do_clean_up(){
-    # remove the directory
-    rm -rf $DIR
+    # remove the rakpios-cli tool
+    rm -rf ${bin_DIR}/rakpios-cli ${lib_DIR} ${config_DIR}
 }
 
 do_upgrade(){
@@ -119,19 +120,40 @@ do_fresh_install(){
     # print install location
     do_clean_up
     do_print_install_location
-    mkdir $DIR
+    
+    if test -f "$DIR"; then
+        echo "$DIR exists"   
+    else
+        mkdir $DIR
+    fi 
     # download the portainer app template and Stack file from portainer-template repo
     curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
-    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR
-    cp -r $DIR/portainer-templates-master/Stack/ $DIR
-    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+    
+    if test -f "$config_DIR"; then
+        echo "$config_DIR exists"   
+    else
+        mkdir -p $config_DIR
+    fi 
+    cp $DIR/portainer-templates-master/portainer_app_template.json $config_DIR
+    
+    # cp -r $DIR/portainer-templates-master/Stack/ $config_DIR
+    # rm -rf $DIR/files.zip $DIR/portainer-templates-master/
     # download the scripts from the rakpios-cli repo 
     curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
-    cp -r $DIR/cli-test-main/bin $DIR/bin
-    cp $DIR/cli-test-main/version $DIR/version
+    
+    if test -f "$lib_DIR"; then
+        echo "$lib_DIR exists"   
+    else
+        mkdir -p $lib_DIR
+    fi 
+
+    cp -r $DIR/cli-test-main/bin/* $lib_DIR
+    cp $DIR/cli-test-main/version $config_DIR/version
     # Copy main script to the /bin directory
-    cp $DIR/cli-test-main/rakpios-cli /usr/local/bin/rakpios-cli
-    rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
+    cp $DIR/cli-test-main/rakpios-cli $bin_DIR/rakpios-cli
+    #clean up
+    rm -rf $DIR
+    source ~/.profile
 }
 
 do_check_docker_basic(){
@@ -203,14 +225,14 @@ do_update_notification(){
     VERSION_PATTERN=^v[0-99].[0-99]
     # will change the URL to the json file stored in the portainer repo before release
     REMOTE_VERSION_URL_portainer_json="https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json"
-    LOCAL_VERSION_PATH="$DIR/portainer_app_template.json"
+    LOCAL_VERSION_PATH="${config_DIR}/portainer_app_template.json"
 
     # maybe we can improve this approach?
     REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sheng2216/cli-test/main/version"
-    LOCAL_VERSION_PATH="${DIR}/version"
+    LOCAL_VERSION_PATH="${config_DIR}/version"
 
     remote_version_portainer_json=$(curl -s $REMOTE_VERSION_URL_portainer_json | jq '.version_for_rakpios_cli' | tr -d '"')
-    local_version_portainer_json=$(jq '.version_for_rakpios_cli' ${DIR}/portainer_app_template.json | tr -d '"')
+    local_version_portainer_json=$(jq '.version_for_rakpios_cli' ${config_DIR}/portainer_app_template.json | tr -d '"')
 
     remote_version_rakpios_cli=$(curl -s $REMOTE_VERSION_URL)
     local_version_rakpios_cli=$(cat $LOCAL_VERSION_PATH)
@@ -242,22 +264,21 @@ do_update_notification(){
 
 do_portainer_json_update(){
     curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
-    cp $DIR/portainer-templates-master/portainer_app_template.json $DIR/portainer_app_template.json
-    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+    cp $DIR/portainer-templates-master/portainer_app_template.json $${config_DIR}/portainer_app_template.json
+    # rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+    rm -rf $DIR
 }
 
 do_rakpios_cli_update(){
     curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
-    cp -r $DIR/cli-test-main/bin $DIR/bin
-    cp $DIR/cli-test-main/version $DIR/version
+    cp -r $DIR/cli-test-main/bin/* $lib_DIR
+    cp $DIR/cli-test-main/version $config_DIR/version
     # copy the new script to the /bin directory
-    cp $DIR/cli-test-main/rakpios-cli /bin/rakpios-cli
-    rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
+    cp $DIR/cli-test-main/rakpios-cli $bin_DIR/rakpios-cli
+    # rm -rf $DIR/rakpios-cli-bin.zip $DIR/cli-test-main
+    rm -rf $DIR
 }
 
-do_print_install_location(){
-    echo "The rakpios-cli will be installed in the ${DIR}"
-}
 
 ###################################################################################################
 
