@@ -2,9 +2,7 @@
 
 ## Remote bash execution script.
 
-Use `curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli -sSf | sudo bash -s -- --install
-` to install. 
+Use `curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli -sSf | bash -s -- --install && source ~/.profile` to install. 
 
-Use `curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli -sSf | sudo bash -s -- --upgrade
-` to upgrade. 
+Use `curl https://raw.githubusercontent.com/Sheng2216/cli-test/main/rakpios-cli -sSf | bash -s -- --upgrade && source ~/.profile` to upgrade. 
 
