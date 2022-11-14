@@ -150,6 +150,7 @@ do_fresh_install(){
     cp -r $DIR/cli-test-main/bin/* $lib_DIR
     cp $DIR/cli-test-main/version $config_DIR/version
     # Copy main script to the /bin directory
+    mkdir -p $bin_DIR
     cp $DIR/cli-test-main/rakpios-cli $bin_DIR/rakpios-cli
     #clean up
     rm -rf $DIR
