@@ -124,7 +124,7 @@ do_fresh_install(){
     if test -f "$DIR"; then
         echo "$DIR exists"   
     else
-        mkdir $DIR
+        mkdir -p $DIR
     fi 
     # download the portainer app template and Stack file from portainer-template repo
     curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
