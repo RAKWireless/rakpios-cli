@@ -6,7 +6,10 @@
 # set -u
 # set -e
 
-# DIR="/usr/local/bin/.rakpios-cli"
+INSTALL=0
+UPGRADE=0
+DEBUG=0
+
 DIR="${HOME}/.cache/rakpios-cli"
 bin_DIR="${HOME}/.local/bin"
 lib_DIR="${HOME}/.local/lib/rakpios-cli"
@@ -18,6 +21,12 @@ config_DIR="${HOME}/.config/rakpios-cli"
 #   exit 1
 # fi
 
+function __msg_debug(){
+
+    [[ "${DEBUG}"=="1" ]] && echo -e "[DEBUG]: $*"
+
+}
+
 # usage information
 usage() {
     cat 1>&2 <<EOF
@@ -28,6 +37,7 @@ USAGE:
 FLAGS:
     -i, --install           Install rakpios-cli
     -u, --upgrade           Upgrade rakpios-cli
+    -d, --debug             Prints debug message
     -h, --help              Prints help information
 EOF
 }
@@ -42,8 +52,8 @@ main(){
     need_cmd network-manager
     # docker will be checkd separately
 
-    SHORT=i,u,h
-    LONG=install,upgrade,help
+    SHORT=i,u,d,h
+    LONG=install,upgrade,debug,help
     OPTS=$(getopt --options $SHORT --longoptions $LONG -- "$@")
 
     if [ $? -ne 0 ]; then
@@ -61,12 +71,16 @@ main(){
                 exit 0
                 ;;
             -i | --install) # Install rakpios-cli
-                do_check_install_status
-                exit 0
+                INSTALL=0
+                shift
+                ;;
+            -d | --debug) # Prints debug message
+                DEBUG=1
+                shift
                 ;;
             -u | --upgrade) # Upgrade rakpios-cli
-                do_upgrade
-                exit 0
+                UPGRADE=0
+                shift
                 ;;            
             *)
                 # echo "invalid command: $1"
@@ -75,6 +89,17 @@ main(){
                 ;;
         esac
     done
+
+    if [ "$INSTALL" == "1" ]; then
+        do_check_install_status
+        exit 0
+    fi
+
+    if [ "$UPGRADE" == "1" ]; then
+        do_upgrade
+        exit 0
+    fi
+
     # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
         source $lib_DIR/portainer-json-parser
@@ -100,7 +125,7 @@ do_check_install_status(){
 }
 
 do_print_install_location(){
-    echo "The rakpios-cli will be installed in the ${bin_DIR},${lib_DIR},and ${config_DIR}"
+    __msg_debug "The rakpios-cli will be installed in the ${bin_DIR},${lib_DIR},and ${config_DIR}"
 }
 
 do_clean_up(){
@@ -122,7 +147,7 @@ do_fresh_install(){
     do_print_install_location
     
     if test -f "$DIR"; then
-        echo "$DIR exists"   
+        __msg_debug "$DIR exists"   
     else
         mkdir -p $DIR
     fi 
@@ -130,7 +155,7 @@ do_fresh_install(){
     curl https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -o $DIR/files.zip -d $DIR/
     
     if test -f "$config_DIR"; then
-        echo "$config_DIR exists"   
+        __msg_debug "$config_DIR exists"   
     else
         mkdir -p $config_DIR
     fi 
@@ -142,7 +167,7 @@ do_fresh_install(){
     curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     
     if test -f "$lib_DIR"; then
-        echo "$lib_DIR exists"   
+        __msg_debug "$lib_DIR exists"   
     else
         mkdir -p $lib_DIR
     fi 
@@ -170,7 +195,7 @@ do_check_docker_basic(){
 }
 
 do_rakpios_cli_menu(){
-    main_menu_option=$(whiptail --notags --title "RAKPiOS CLI" --menu "choose your option" 20 78 8 "network" "Manage the network" "container" "Deploy docker containers" "update" "Update the RAKPiOS CLI tool" 3>&1 1>&2 2>&3)
+    main_menu_option=$(whiptail --notags --title "RAKPiOS Configuration Tool (rakpios-cli)" --menu "" 20 78 8 "network" "Manage networks" "container" "Deploy services" --cancel-button Finish --ok-button Select 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
         case $main_menu_option in
@@ -182,25 +207,13 @@ do_rakpios_cli_menu(){
               do_check_docker_basic
               do_container
               ;;
-
-            update)
-              if (whiptail --title "Confirmation" --yesno "Do you want to update the RAKPiOS CLI tool ?" 8 78); then
-                  echo "User selected Yes."
-                  do_fresh_install
-                  whiptail --msgbox --title "Update completed" "Update completed..." 25 80
-                  exit 0
-              else
-                  echo "User selected No."
-              fi
-              ;;
-
             *)
               echo -n "unknown"
               ;;
         esac
     do_rakpios_cli_menu
     else
-        echo "User selected Cancel."
+        __msg_debug "User selected Cancel."
         exit 0
     fi
 }
@@ -245,20 +258,20 @@ do_update_notification(){
     # check updates for sportainer_json
     if [[ $remote_version_portainer_json > $local_version_portainer_json ]]; then
         if (whiptail --title "Update protainer json file" --yesno "An portainer json file update is available, do you want to update it?" 8 78); then
-            echo "User selected Yes, exit status was $?."
+            __msg_debug "User selected Yes, exit status was $?."
             do_portainer_json_update
         else
-            echo "User selected not to update portainer json."
+            __msg_debug "User selected not to update portainer json."
         fi
     fi
 
     # check updates for rakpios-cli
     if [[ $remote_version_rakpios_cli > $local_version_rakpios_cli ]]; then
         if (whiptail --title "Update rakpios-cli" --yesno "An update for RAKPiOS-CLI is available, do you want to update it?" 8 78); then
-            echo "User selected Yes, exit status was $?."
+            __msg_debug "User selected Yes, exit status was $?."
             do_rakpios_cli_update
         else
-            echo "User selected not to update RAKPiOS-CLI."
+            __msg_debug "User selected not to update RAKPiOS-CLI."
         fi
     fi
 }
