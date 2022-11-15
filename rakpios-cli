@@ -23,7 +23,7 @@ config_DIR="${HOME}/.config/rakpios-cli"
 
 function __msg_debug(){
 
-    [[ "${DEBUG}"=="1" ]] && echo -e "[DEBUG]: $*"
+    [[ "${DEBUG}" == "1" ]] && echo -e "[DEBUG]: $*"
 
 }
 
