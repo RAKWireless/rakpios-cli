@@ -303,6 +303,7 @@ do_check_service_type(){
     else
         do_docker_compose_up
     fi
+    do_print_post_up_info
 }
 
 do_get_basic_info(){
@@ -395,7 +396,7 @@ do_print_post_up_info(){
 
 do_container(){
     do_select_service
-    do_print_post_up_info
+    #do_print_post_up_info
 }
 
 # if [ $(id -u) -ne 0 ]; then
