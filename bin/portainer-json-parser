@@ -54,7 +54,7 @@ do_portainer(){
 }
 
 do_portainer_configure(){
-    variable=$(whiptail --notags --title "Variables" --ok-button "Change" --cancel-button "Save and Back" --menu "Configure variables" 20 100 10  \
+    variable=$(whiptail --notags --title "Variables" --ok-button "Change" --cancel-button "Save and Back" --menu "" 20 100 10  \
     "PUID" "PUID" \
     "PGID" "PGID" \
     "TZ" "Time Zone" \
