@@ -71,7 +71,7 @@ main(){
                 exit 0
                 ;;
             -i | --install) # Install rakpios-cli
-                INSTALL=0
+                INSTALL=1
                 shift
                 ;;
             -d | --debug) # Prints debug message
@@ -79,7 +79,7 @@ main(){
                 shift
                 ;;
             -u | --upgrade) # Upgrade rakpios-cli
-                UPGRADE=0
+                UPGRADE=1
                 shift
                 ;;            
             *)
