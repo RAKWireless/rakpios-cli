@@ -164,7 +164,7 @@ do_fresh_install(){
     # cp -r $DIR/portainer-templates-master/Stack/ $config_DIR
     # rm -rf $DIR/files.zip $DIR/portainer-templates-master/
     # download the scripts from the rakpios-cli repo 
-    curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
+    curl https://github.com/kkcloudy/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     
     if test -f "$lib_DIR"; then
         __msg_debug "$lib_DIR exists"   
@@ -242,7 +242,7 @@ do_update_notification(){
     LOCAL_VERSION_PATH="${config_DIR}/portainer_app_template.json"
 
     # maybe we can improve this approach?
-    REMOTE_VERSION_URL="https://raw.githubusercontent.com/Sheng2216/cli-test/main/version"
+    REMOTE_VERSION_URL="https://raw.githubusercontent.com/kkcloudy/cli-test/main/version"
     LOCAL_VERSION_PATH="${config_DIR}/version"
 
     remote_version_portainer_json=$(curl -s $REMOTE_VERSION_URL_portainer_json | jq '.version_for_rakpios_cli' | tr -d '"')
@@ -284,7 +284,7 @@ do_portainer_json_update(){
 }
 
 do_rakpios_cli_update(){
-    curl https://github.com/Sheng2216/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
+    curl https://github.com/kkcloudy/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     cp -r $DIR/cli-test-main/bin/* $lib_DIR
     cp $DIR/cli-test-main/version $config_DIR/version
     # copy the new script to the /bin directory
