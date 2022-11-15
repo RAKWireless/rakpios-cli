@@ -373,7 +373,9 @@ do_docker_compose_up(){
     docker_compose_env_list="$(echo ${env_full_list} | sed 's/-e //g')"
     docker_compose_command="${docker_compose_env_list} docker compose -f ${yml_file_path} up -d"
     __msg_debug $docker_compose_command
+    pushd $config_DIR
     eval $docker_compose_command
+    popd
 }
 
 do_print_post_up_info(){
