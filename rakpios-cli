@@ -161,8 +161,8 @@ do_fresh_install(){
     fi 
     cp $DIR/portainer-templates-master/portainer_app_template.json $config_DIR
     
-    # cp -r $DIR/portainer-templates-master/Stack/ $config_DIR
-    # rm -rf $DIR/files.zip $DIR/portainer-templates-master/
+    cp -r $DIR/portainer-templates-master/Stack/ $config_DIR
+    rm -rf $DIR/files.zip $DIR/portainer-templates-master/
     # download the scripts from the rakpios-cli repo 
     curl https://github.com/kkcloudy/cli-test/archive/refs/heads/main.zip -L -o $DIR/rakpios-cli-bin.zip && unzip -o $DIR/rakpios-cli-bin.zip -d $DIR/
     
