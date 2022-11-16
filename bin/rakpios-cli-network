@@ -22,9 +22,20 @@ do_configure_static()
 	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
 
 	IP=$(whiptail --inputbox "input IP address/prefix" 10 60 "192.168.240.100/24" --title "IP address" 3>&1 1>&2 2>&3)
+	if [ -z $IP ]; then
+		clear
+		return 0
+	fi
 	GW=$(whiptail --inputbox "input Gateway address" 10 60 "192.168.240.1" --title "gateway address" 3>&1 1>&2 2>&3)
-    DNS=$(whiptail --inputbox "input dns server address" 10 60 "8.8.8.8" --title "gateway address" 3>&1 1>&2 2>&3)
-
+    if [ -z $GW ]; then
+		clear
+		return 0
+	fi
+	DNS=$(whiptail --inputbox "input dns server address" 10 60 "8.8.8.8" --title "gateway address" 3>&1 1>&2 2>&3)
+	if [ -z $DNS]; then
+		clear
+		return 0
+	fi
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then    					
 		if [ -e $FILE ]; then
 			sudo nmcli connection modify filename $FILE ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual
@@ -75,9 +86,8 @@ do_configure_ethernet()
 do_wifi_ap()
 {
 	SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
-	
-	RET=$?
-	if [ $RET -eq 1 ]; then
+
+	if [ -z $SSID ]; then
 		clear
 		return 0
 	fi
@@ -85,7 +95,7 @@ do_wifi_ap()
 	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
 	
 	RET=$?
-	if [ $RET -eq 1 ]; then
+	if [ -z $PASSWD ]; then
 		clear
 		return 0
 	fi
@@ -123,8 +133,7 @@ do_wifi_sta()
 
     		SSID=$(whiptail --notags --menu "Scan List:" 15 60 4 ${ssid_list[@]} 3>&1 1>&2 2>&3)
 			
-			RET=$?
-			if [ $RET -eq 1 ]; then
+			if [ -z $SSID ]; then
 				clear
 				return 0
 			fi
@@ -132,8 +141,7 @@ do_wifi_sta()
 			2)
 			SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
 			
-			RET=$?
-			if [ $RET -eq 1 ]; then
+			if [ -z $SSID ]; then
 				clear
 				return 0
 			fi
@@ -143,8 +151,7 @@ do_wifi_sta()
 
 	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
 	
-	RET=$?
-	if [ $RET -eq 1 ]; then
+	if [ -z $PASSWD ]; then
 		clear
 		return 0
 	fi
@@ -204,18 +211,11 @@ do_configure_lte()
 {
 	APN=$(whiptail --inputbox "Please enter APN" 10 60 --title "APN" 3>&1 1>&2 2>&3)
 	
-	RET=$?
-	if [ $RET -eq 1 ]; then
+	if [ -z $APN ]; then
 		clear
 		return 0
 	fi
 	PIN=$(whiptail --inputbox "Please enter PIN Leave it empty if none." 10 60 --title "PIN" 3>&1 1>&2 2>&3)
-
-	RET=$?
-	if [ $RET -eq 1 ]; then
-		clear
-		return 0
-	fi
 	
 	FILE="/etc/NetworkManager/system-connections/gsm.nmconnection"
     if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
