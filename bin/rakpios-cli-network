@@ -8,7 +8,7 @@ do_configure_dhcp()
 
 		if [ -e $FILE ]; then
 			nmcli connection modify filename $FILE ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
-			RET=$(nmcli connection up filename $FILE)
+			RET=$(nmcli connection up filename $FILE 2>&1)
 			whiptail --title "Notes" --msgbox  "$RET" 10 60			
 		fi
 	else		
@@ -31,7 +31,7 @@ do_configure_static()
 		else
 			nmcli connection add con-name $1 ifname $1 type ethernet ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual			
 		fi
-		RET=$(nmcli connection up filename $FILE)
+		RET=$(nmcli connection up filename $FILE 2>&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 	else
     	return 0
@@ -83,7 +83,7 @@ do_wifi_ap()
 		else
 			nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID mode ap 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
 		fi
-		RET=$(nmcli connection up filename $FILE)
+		RET=$(nmcli connection up filename $FILE 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 
 	else
@@ -125,7 +125,7 @@ do_wifi_sta()
 		else
 			nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD			
         fi
-		RET=$(nmcli connection up filename $FILE)
+		RET=$(nmcli connection up filename $FILE 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 
     else
@@ -190,7 +190,7 @@ do_configure_lte()
 				nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn $APN gsm.pin $PIN
 			fi
         fi
-		RET=$(nmcli connection up gsm)
+		RET=$(nmcli connection up gsm 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60	
     else
         return 0
