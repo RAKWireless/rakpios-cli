@@ -7,8 +7,8 @@ do_configure_dhcp()
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
 		if [ -e $FILE ]; then
-			nmcli connection modify filename $FILE ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
-			RET=$(nmcli connection up filename $FILE 2>&1)
+			sudo nmcli connection modify filename $FILE ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
+			RET=$(sudo nmcli connection up filename $FILE 2>&1)
 			whiptail --title "Notes" --msgbox  "$RET" 10 60			
 		fi
 	else		
@@ -27,11 +27,11 @@ do_configure_static()
 
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then    					
 		if [ -e $FILE ]; then
-			nmcli connection modify filename $FILE ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual
+			sudo nmcli connection modify filename $FILE ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual
 		else
-			nmcli connection add con-name $1 ifname $1 type ethernet ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual			
+			sudo nmcli connection add con-name $1 ifname $1 type ethernet ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual			
 		fi
-		RET=$(nmcli connection up filename $FILE 2>&1)
+		RET=$(sudo nmcli connection up filename $FILE 2>&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 	else
     	return 0
@@ -79,11 +79,11 @@ do_wifi_ap()
 	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 		if [ -e $FILE ]; then
-			nmcli connection modify filename $FILE wifi.mode ap wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
+			sudo nmcli connection modify filename $FILE wifi.mode ap wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
 		else
-			nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID mode ap 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
+			sudo nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID mode ap 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
 		fi
-		RET=$(nmcli connection up filename $FILE 2<&1)
+		RET=$(sudo nmcli connection up filename $FILE 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 
 	else
@@ -102,7 +102,7 @@ do_wifi_sta()
 	elif [ $RET -eq 0 ]; then
     	case "$FUN" in
 			1)
-            SSID_LIST=$(nmcli device wifi list | tail -n +2 | awk '{print $2}' | sed 's/--//g')
+            SSID_LIST=$(sudo nmcli device wifi list | tail -n +2 | awk '{print $2}' | sed 's/--//g')
             while read -r line; do
         		ssid_list+=("$line" "$line")
     		done <<< "$SSID_LIST"
@@ -121,11 +121,11 @@ do_wifi_sta()
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
         if [ -e $FILE ]; then
-            nmcli connection modify filename $FILE wifi.mode '' wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method auto ipv4.addresses '' 
+            sudo nmcli connection modify filename $FILE wifi.mode '' wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method auto ipv4.addresses '' 
 		else
-			nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD			
+			sudo nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD			
         fi
-		RET=$(nmcli connection up filename $FILE 2<&1)
+		RET=$(sudo nmcli connection up filename $FILE 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 
     else
@@ -179,18 +179,18 @@ do_configure_lte()
         if [ -e $FILE ]; then
 	
 			if [ -z "$PIN" ]; then
-				nmcli connection modify filename $FILE gsm.apn $APN gsm.pin ''
+				sudo nmcli connection modify filename $FILE gsm.apn $APN gsm.pin ''
 			else
-				nmcli connection modify filename $FILE gsm.apn $APN gsm.pin $PIN
+				sudo nmcli connection modify filename $FILE gsm.apn $APN gsm.pin $PIN
 			fi
 		else
 			if [ -z "$PIN" ]; then
-				nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn $APN 
+				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn $APN 
 			else
-				nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn $APN gsm.pin $PIN
+				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn $APN gsm.pin $PIN
 			fi
         fi
-		RET=$(nmcli connection up gsm 2<&1)
+		RET=$(sudo nmcli connection up gsm 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60	
     else
         return 0
