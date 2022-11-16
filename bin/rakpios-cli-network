@@ -75,7 +75,21 @@ do_configure_ethernet()
 do_wifi_ap()
 {
 	SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
+	
+	RET=$?
+	if [ $RET -eq 1 ]; then
+		clear
+		return 0
+	fi
+
 	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
+	
+	RET=$?
+	if [ $RET -eq 1 ]; then
+		clear
+		return 0
+	fi
+
 	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 		if [ -e $FILE ]; then
@@ -108,14 +122,32 @@ do_wifi_sta()
     		done <<< "$SSID_LIST"
 
     		SSID=$(whiptail --notags --menu "Scan List:" 15 60 4 ${ssid_list[@]} 3>&1 1>&2 2>&3)
+			
+			RET=$?
+			if [ $RET -eq 1 ]; then
+				clear
+				return 0
+			fi
 			;;
 			2)
 			SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
+			
+			RET=$?
+			if [ $RET -eq 1 ]; then
+				clear
+				return 0
+			fi
 			;;
 		esac
 	fi
 
 	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
+	
+	RET=$?
+	if [ $RET -eq 1 ]; then
+		clear
+		return 0
+	fi
 	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
    
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
@@ -171,8 +203,20 @@ do_configure_wifi()
 do_configure_lte()
 {
 	APN=$(whiptail --inputbox "Please enter APN" 10 60 --title "APN" 3>&1 1>&2 2>&3)
+	
+	RET=$?
+	if [ $RET -eq 1 ]; then
+		clear
+		return 0
+	fi
 	PIN=$(whiptail --inputbox "Please enter PIN Leave it empty if none." 10 60 --title "PIN" 3>&1 1>&2 2>&3)
 
+	RET=$?
+	if [ $RET -eq 1 ]; then
+		clear
+		return 0
+	fi
+	
 	FILE="/etc/NetworkManager/system-connections/gsm.nmconnection"
     if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
