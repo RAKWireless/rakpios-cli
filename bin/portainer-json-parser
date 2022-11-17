@@ -25,6 +25,7 @@ do_select_service(){
             if [[ $service_to_start == "portainer" ]] ; then 
                 #default variables for the portainer service
                 portainer_version=2.14.0
+                portainer_template_url=https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json
                 portainer_password=\$2y\$05\$CamDlWaqdhRQvy1AuOZlY.4QYi/GptU6lDruXD0YiYiwQljGJmamC
                 portainer_PUID=1000
                 portainer_PGID=100
