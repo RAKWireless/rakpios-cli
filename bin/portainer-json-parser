@@ -241,8 +241,9 @@ do_change_service_env(){
             option_values_array+=("$line" "$line")
         done <<< "$option_values"
         # display whiptail menu listing out available options
-        value_changed_to_text=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${option_values_array[@]}" 3>&1 1>&2 2>&3) 
+        value_changed_tmp=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${option_values_array[@]}" 3>&1 1>&2 2>&3) 
         exitstatus=$?
+        value_changed_to_text=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" --arg value_changed_tmp "${value_changed_tmp}" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | .select[] | select(.text==$value_changed_tmp) |.value' ${config_DIR}/portainer_app_template.json | tr -d '"')
         # echo "value_changed_to_text ${value_changed_to_text}"
         if [ $exitstatus != 0 ]; then
             do_choose_service_env
