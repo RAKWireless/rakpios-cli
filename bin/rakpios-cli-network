@@ -244,7 +244,7 @@ do_configure_lte()
 
 do_network_main_menu()
 {
-	FUN=$(whiptail --title "NetWork" --menu "" 15 60 4 \
+	FUN=$(whiptail --title "Network" --menu "" 15 60 4 \
                 1 "Configure Ethernet" \
                 2 "Configure WiFi" \
                 3 "Configure LTE" \

@@ -35,8 +35,6 @@ do_select_service(){
                 do_env_variable_concat
                 do_pre_up_options
             fi
-        else
-            exit 0
         fi
 }
 
