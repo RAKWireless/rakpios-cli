@@ -109,6 +109,7 @@ main(){
     if (( $OPTIND == 1 )); then
         source $lib_DIR/portainer-json-parser
         source $lib_DIR/rakpios-cli-network
+        source $lib_DIR/rakpios-cli-service
         do_check_for_update
         do_rakpios_cli_menu
     fi
@@ -230,17 +231,19 @@ do_check_docker_basic(){
 }
 
 do_rakpios_cli_menu(){
-    main_menu_option=$(whiptail --notags --title "RAKPiOS Configuration Tool (rakpios-cli)" --menu "" 20 78 8 "network" "Manage networks" "container" "Deploy services" --cancel-button Finish --ok-button Select 3>&1 1>&2 2>&3)
+    main_menu_option=$(whiptail --notags --title "RAKPiOS Configuration Tool (rakpios-cli)" --menu "" 20 78 8 "network" "Manage networks" "container" "Deploy services" "list" "List services" --cancel-button Finish --ok-button Select 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
         case $main_menu_option in
             network)
               do_network_main_menu
               ;;
-
             container)
               do_check_docker_basic
               do_container
+              ;;
+            list)
+              do_service_menu
               ;;
             *)
               echo -n "unknown"

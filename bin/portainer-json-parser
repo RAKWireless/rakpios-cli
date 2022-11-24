@@ -301,11 +301,43 @@ do_check_service_type(){
     do_get_basic_info
     service_type=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) |.type' ${config_DIR}/portainer_app_template.json)
     if [ $service_type == "1" ]; then
-        do_docker_run    
+        tmp_name=$(echo $container_name | awk '{print $2}')
+        CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep ${tmp_name})
+        if [ -z $CONTAINER_NAME ]; then
+            do_docker_run
+            do_print_post_up_info
+        else
+            whiptail --title "Notes" --msgbox  "$CONTAINER_NAME already exists." 10 60
+            do_command
+        fi
     else
-        do_docker_compose_up
+        yml_file_path="./$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' ${config_DIR}/portainer_app_template.json | tr -d '"')"
+        pushd $config_DIR  >> /dev/null
+        tmp_name_list=$(cat $yml_file_path | grep container_name | awk '{print $2}')
+        popd  >> /dev/null
+        if [ -z $tmp_name_list ]; then
+            do_docker_compose_up
+            do_print_post_up_info
+        else
+            exist=0
+            for tmp_name in $tmp_name_list; do
+                CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep ${tmp_name})
+                if [ -z $CONTAINER_NAME ]; then
+                    continue
+                else
+                    exist=1
+                    whiptail --title "Notes" --msgbox  "$CONTAINER_NAME already exsits." 10 60
+                    do_command
+                    break;
+                fi
+            done
+
+            if [ "$exist" == "0" ]; then
+                do_docker_compose_up
+                do_print_post_up_info
+            fi
+        fi
     fi
-    do_print_post_up_info
 }
 
 do_get_basic_info(){

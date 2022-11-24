@@ -1,0 +1,63 @@
+#!/bin/bash
+
+do_command()
+{
+	STATUS=$(docker ps -a --format '{{.Names}}\t{{.Status}}' | grep $CONTAINER_NAME | awk '{ print $2 }')
+    CMD=$(whiptail --notags --title "$CONTAINER_NAME" --menu "" 15 60 3 \
+        	"start" "Start The Service" \
+        	"stop" "Stop The Service" \
+        	"remove" "Remove The Service" \
+        	3>&1 1>&2 2>&3)
+
+	if [ -z $CMD ]; then
+		do_service_menu
+	else
+    	case "$CMD" in
+			"start")
+				if [ "$STATUS" == "Up" ]; then
+					whiptail --title "Notes" --msgbox  "$CONTAINER_NAME is already started." 10 60
+				else
+					docker start $CONTAINER_NAME
+					STATUS=$(docker ps -a --format '{{.Names}}\t{{.Status}}' | grep $CONTAINER_NAME | awk '{ print $2 }')
+                    if [ "$STATUS" == "Up" ]; then
+						whiptail --title "Notes" --msgbox  "$CONTAINER_NAME is started now." 10 60
+					fi
+				fi
+				;;
+			"stop")
+				if [ "$STATUS" == "Exited" ]; then
+					whiptail --title "Notes" --msgbox  "$CONTAINER_NAME is already stopped." 10 60
+				else
+					docker stop $CONTAINER_NAME
+					STATUS=$(docker ps -a --format '{{.Names}}\t{{.Status}}' | grep $CONTAINER_NAME | awk '{ print $2 }')
+                    if [ "$STATUS" == "Exited" ]; then
+                        whiptail --title "Notes" --msgbox  "$CONTAINER_NAME is stopped now." 10 60
+                    fi
+				fi
+                ;;
+			"remove")
+				docker stop $CONTAINER_NAME
+				docker rm $CONTAINER_NAME
+				;;
+		esac
+	fi
+}
+
+do_service_menu()
+{
+	SERVICES=$(docker ps -a --format '{{.Names}}' | sort -k1)
+	list=()	
+	for service in $SERVICES; do
+		list+="$service $service "
+    done
+	
+	CONTAINER_NAME=$(whiptail --notags --title "Service List" --menu "" 15 60 4 $list 3>&1 1>&2 2>&3)
+
+	if [ ! -z $CONTAINER_NAME ]; then
+		do_command
+	fi
+
+}
+
+#do_service_menu
+
