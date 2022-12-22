@@ -11,26 +11,23 @@ UPGRADE=0
 DEBUG=0
 CONFIG_FILE=0
 
-DIR="${HOME}/.cache/rakpios-cli"
-bin_DIR="${HOME}/.local/bin"
-lib_DIR="${HOME}/.local/lib/rakpios-cli"
-config_DIR="${HOME}/.config/rakpios-cli"
+DIR_TMP="${HOME}/.cache/rakpios-cli"
+DIR_BIN="${HOME}/.local/bin"
+DIR_LIB="${HOME}/.local/lib/rakpios-cli"
+DIR_CNF="${HOME}/.config/rakpios-cli"
 
-org="kkcloudy"
-#org="sheng2216"
-repo="cli-test"
+org="xoseperez"
+repo="rakpios-cli"
 
 function __msg_debug(){
-
     [[ "${DEBUG}" == "1" ]] && echo -e "[DEBUG]: $*"
-
 }
 
 # usage information
 usage() {
     cat 1>&2 <<EOF
 rakpios-cli
-The command line tool for RAKPiOS
+Command line tool for RAKPiOS
 USAGE:
     rakpios-cli [FLAGS]
 FLAGS:
@@ -43,7 +40,8 @@ EOF
 }
 
 
-main(){
+main() {
+    
     # check for necessary tools
     need_cmd curl
     need_cmd jq
@@ -82,11 +80,10 @@ main(){
                 UPGRADE=1
                 shift
                 ;; 
-
             -v | --version) # Prints version information
                 do_print_version
                 exit 0
-                ;;            
+                ;;    
             *)
                 # echo "invalid command: $1"
                 # usage
@@ -107,16 +104,16 @@ main(){
 
     # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
-        source $lib_DIR/portainer-json-parser
-        source $lib_DIR/rakpios-cli-network
-        source $lib_DIR/rakpios-cli-service
+        source ${DIR_LIB}/portainer-json-parser
+        source ${DIR_LIB}/rakpios-cli-network
+        source ${DIR_LIB}/rakpios-cli-service
         do_check_for_update
         do_rakpios_cli_menu
     fi
 }
 
 do_check_install_status(){
-    if test -f "${bin_DIR}/rakpios-cli"; then
+    if test -f "${DIR_BIN}/rakpios-cli"; then
         whiptail --title "Confirmation" --yesno "Looks like rakpios-cli is already installed. \nDo you want to upgrade the rakpios-cli to the latest version?" 10 78 --yes-button "Yes" --no-button "No" 
         if [[ $? -eq 0 ]]; then 
             do_upgrade
@@ -131,13 +128,13 @@ do_check_install_status(){
 }
 
 do_print_install_location(){
-    __msg_debug "The rakpios-cli will be installed in the ${bin_DIR},${lib_DIR},and ${config_DIR}"
+    __msg_debug "The rakpios-cli will be installed in the ${DIR_BIN},${DIR_LIB},and ${DIR_CNF}"
 }
 
 do_print_version(){
-    LOCAL_VERSION_PATH="${config_DIR}/portainer_app_template.json"
-    if [ -f "$LOCAL_VERSION_PATH" ] && [ -d "${config_DIR}/.git" ]; then
-        __msg_debug  "found configuration files saved in ${LOCAL_VERSION_PATH} and ${config_DIR}/.git"   
+    LOCAL_VERSION_PATH="${DIR_CNF}/portainer_app_template.json"
+    if [ -f "$LOCAL_VERSION_PATH" ] && [ -d "${DIR_CNF}/.git" ]; then
+        __msg_debug  "Found configuration files saved in ${LOCAL_VERSION_PATH} and ${DIR_CNF}/.git"   
         do_get_version_information
         echo "rakpios-cli version is ${local_version_rakpios_cli} (latest available version is ${remote_version_rakpios_cli})"
         echo "service version is ${local_version_portainer_json} (latest available version is ${remote_version_portainer_json}) "
@@ -148,8 +145,8 @@ do_print_version(){
 
 do_clean_up(){
     # remove the rakpios-cli tool and configurations
-    if [ -d "$DIR" ] || [ -f "${bin_DIR}/rakpios-cli" ] || [ -d "$lib_DIR" ] || [ -d "$config_DIR" ]; then
-        rm -rf $DIR ${bin_DIR}/rakpios-cli $lib_DIR $config_DIR
+    if [ -d "${DIR_TMP}" ] || [ -f "${DIR_BIN}/rakpios-cli" ] || [ -d "${DIR_LIB}" ] || [ -d "${DIR_CNF}" ]; then
+        rm -rf ${DIR_TMP} ${DIR_BIN}/rakpios-cli ${DIR_LIB} ${DIR_CNF}
     fi
 }
 
@@ -162,9 +159,9 @@ do_upgrade(){
 }
 
 # Check install directory
-do_check_directory(){
-    declare files=${*:-$(</dev/stdin)}
-    for PARAM in $files; do
+do_check_directory() {
+    declare FILES=${*:-$(</dev/stdin)}
+    for PARAM in $FILES; do
         # do what needs to be done on each input value
         if test -d $PARAM; then
             __msg_debug "$PARAM exists"
@@ -175,11 +172,12 @@ do_check_directory(){
     done
 }
 
-do_fresh_install(){
+do_fresh_install() {
+    
     # print install location
     do_clean_up
     do_print_install_location
-    do_check_directory $DIR $lib_DIR $config_DIR $bin_DIR
+    do_check_directory ${DIR_TMP} ${DIR_LIB} ${DIR_CNF} ${DIR_BIN}
 
     # clone the rakpios-cli repo and move the files
     if [ $UPGRADE==1 ]; then
@@ -187,38 +185,44 @@ do_fresh_install(){
     else
         echo "Installing rakpios-cli tool..."
     fi
-    if git clone --quiet https://github.com/${org}/${repo}.git $DIR/; then
+
+    if git clone --quiet https://github.com/${org}/${repo}.git ${DIR_TMP}/; then
         __msg_debug "Download completed"
-        cp -r $DIR/bin/* $lib_DIR                  #copy executable files
-        cp -r $DIR/.git $config_DIR/.git           #copy configuration files
-        cp $DIR/rakpios-cli $bin_DIR/rakpios-cli   #copy the rakpios-cli main script
-        __msg_debug "rakpios-cli copy completed"
+        cp -r ${DIR_TMP}/lib/* ${DIR_LIB}                   #copy module files
+        cp -r ${DIR_TMP}/.git ${DIR_CNF}/.git               #copy configuration files
+        cp ${DIR_TMP}/rakpios-cli ${DIR_BIN}/rakpios-cli    #copy the rakpios-cli main script
+        __msg_debug "Tool copy completed"
         echo "Download successful"
     else
-        echo "[Error] network error, download failed"
+        echo "[Error] Network error, download failed"
         exit 1
     fi
-    echo "Updating service list..."
+
     # download the portainer app template and Stack file from portainer-template repo
-    if curl -s https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o $DIR/files.zip && unzip -q -o $DIR/files.zip -d $DIR/; then
-        cp $DIR/portainer-templates-master/portainer_app_template.json $config_DIR
-        cp -r $DIR/portainer-templates-master/Stack/ $config_DIR
+    __msg_debug "Updating service list..."
+    if curl -s https://github.com/RAKWireless/portainer-templates/archive/refs/heads/master.zip -L -o ${DIR_TMP}/files.zip && unzip -q -o ${DIR_TMP}/files.zip -d ${DIR_TMP}/; then
+        cp ${DIR_TMP}/portainer-templates-master/portainer_app_template.json ${DIR_CNF}
+        cp -r ${DIR_TMP}/portainer-templates-master/Stack/ ${DIR_CNF}
         echo "Service update successful"
     else
-        echo "[Error] failed to update the service list"
+        echo "[Error] Failed to update the service list"
         exit 1
     fi
+
     # Clean up
-    rm -rf $DIR
-    __msg_debug "Remove cached files $DIR after installation"  
+    __msg_debug "Remove cached files ${DIR_TMP} after installation"  
+    rm -rf ${DIR_TMP}
+
     # Print version information after installation fininshed
     if do_get_version_information; then 
         echo "rakpios-cli version ${local_version_rakpios_cli}"
         echo "service version ${local_version_portainer_json}"
     fi
+
 }
 
 do_check_docker_basic(){
+    
     if [ -x "$(command -v docker)" ]; then
         if docker info --format '{{json .}}' | grep "permission denied"; then
         whiptail --msgbox "Got permission denied while trying to connect to the Docker daemon socket. Please make sure the current user has the right premission." 10 60
@@ -228,9 +232,11 @@ do_check_docker_basic(){
         whiptail --msgbox "Docker not install, please install docker first" 20 60
         exit 1
     fi
+
 }
 
 do_rakpios_cli_menu(){
+
     main_menu_option=$(whiptail --notags --title "RAKPiOS Configuration Tool (rakpios-cli)" --menu "" 20 78 8 "network" "Manage networks" "container" "Deploy services" "list" "List services" --cancel-button Finish --ok-button Select 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
@@ -254,22 +260,28 @@ do_rakpios_cli_menu(){
         __msg_debug "User selected Cancel."
         exit 0
     fi
+
 }
 
 # function to install command if not installed before
 need_cmd() {
+
     if ! check_cmd "$1"; then
         echo "need '$1' (command not found)"
         apt install $1 -y
     fi
+
 }
+
 # function to check whether command is installed or not
 check_cmd() {
+
     if [[ $1 == "network-manager" ]] ; then
         command -v nmcli > /dev/null 2>&1
     else
         command -v "$1" > /dev/null 2>&1
     fi
+
 }
 
 # slient pushd and popd
@@ -281,27 +293,34 @@ popd() {
     command popd "$@" > /dev/null
 }
 
-do_get_version_information(){
+do_get_version_information() {
+
     REMOTE_VERSION_URL_portainer_json="https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json"
-    LOCAL_VERSION_PATH="${config_DIR}/portainer_app_template.json"
-    if [ -f "$LOCAL_VERSION_PATH" ] && [ -d "${config_DIR}/.git" ]; then
+    LOCAL_VERSION_PATH="${DIR_CNF}/portainer_app_template.json"
+    if [ -f "$LOCAL_VERSION_PATH" ] && [ -d "${DIR_CNF}/.git" ]; then
+        
         # use portainer json key value to track the service version
         remote_version_portainer_json=$(curl -s $REMOTE_VERSION_URL_portainer_json | jq '.version_for_rakpios_cli' | tr -d '"')
-        local_version_portainer_json=$(jq '.version_for_rakpios_cli' ${config_DIR}/portainer_app_template.json | tr -d '"')
+        local_version_portainer_json=$(jq '.version_for_rakpios_cli' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+        
         # use github tag to track rakpios-cli version
         remote_version_rakpios_cli=$(curl https://api.github.com/repos/${org}/${repo}/releases/latest -s | jq .tag_name -r)
+        
         # retrieve the local git tag
-        pushd ${config_DIR}
+        pushd ${DIR_CNF}
         local_version_rakpios_cli=$(git tag --sort=committerdate | tail -1)
         popd
+
     else
         __msg_debug "Can not found Portainer and rakpios-cli configuration files."
         CONFIG_FILE=1
     fi
+
 }
 
 # check for updates
 do_check_for_update(){ 
+
     do_get_version_information
     VERSION_PATTERN=^v[0-99].[0-99]
     if [ $CONFIG_FILE == 1 ] ; then
@@ -312,11 +331,13 @@ do_check_for_update(){
         whiptail --title "Error" --msgbox  "Updates check failed, please check your network connection, and try again later." 10 78
         return
     fi
+    
     # check updates for rakpios-cli and portainer template version
     if [[ $remote_version_portainer_json > $local_version_portainer_json ]] || [[ $remote_version_rakpios_cli > $local_version_rakpios_cli ]]; then
         whiptail --title "New Update is available" --msgbox "An update for rakpios-cli is available. Run 'rakpios-cli --upgrade' to upgrade." 8 78
         __msg_debug "An update is available."       
     fi
+
 }
 
 
