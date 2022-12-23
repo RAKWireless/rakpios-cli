@@ -5,40 +5,52 @@
 # set -o pipefail
 # set -u
 
+declare -A service_env
+declare service_name
 
 # function that choose the service to deploy
 do_select_service(){
-    # declare the service list array
-    services_list_array=()
+
     # get the list of available services
-    portainer_services=$(jq '.templates[].title' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
-    # append each service to the services_list_array
+    services=$(jq '.templates[].title' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    services=$(echo -e "$services\nPortainer" | sort)
+    
+    # declare the service list array
+    services_list=()
+
+    # append each service to the services_list
     while read -r line; do
-        services_list_array+=("$line" "$line")
-    done <<< "$portainer_services"
+        services_list+=("$line" "$line")
+    done <<< "$services"
+    
     # display whiptail menu listing out available services
-    service_to_start=$(whiptail --notags --title "Services" --cancel-button "BACK" --menu "" 20 100 10 "portainer" "Portainer" "${services_list_array[@]}" 3>&1 1>&2 2>&3) 
+    service_to_start=$(whiptail --notags --title "Services" --cancel-button "Back" --menu "" 20 100 10 "${services_list[@]}" 3>&1 1>&2 2>&3) 
+    
     exitstatus=$?
-        if [ $exitstatus = 0 ]; then
-            __msg_debug "The chosen service is:" $service_to_start
-            # the Portainer's template is not in the .json file, so no need to parse the json for Portainer
-            if [[ $service_to_start == "portainer" ]] ; then 
-                #default variables for the portainer service
-                portainer_version=2.14.0
-                portainer_template_url=https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json
-                portainer_password=\$2y\$05\$CamDlWaqdhRQvy1AuOZlY.4QYi/GptU6lDruXD0YiYiwQljGJmamC
-                portainer_PUID=1000
-                portainer_PGID=100
-                portainer_TZ=Europe/London
-                do_portainer
-            else
-                do_env_variable_concat
-                do_pre_up_options
-            fi
+    if [ $exitstatus = 0 ]; then
+        
+        __msg_debug "The chosen service is:" $service_to_start
+        
+        # the Portainer's template is not in the .json file, so no need to parse the json for Portainer
+        if [[ $service_to_start == "Portainer" ]] ; then 
+            #default variables for the portainer service
+            portainer_version=2.14.0
+            portainer_template_url=https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json
+            portainer_password=\$2y\$05\$CamDlWaqdhRQvy1AuOZlY.4QYi/GptU6lDruXD0YiYiwQljGJmamC
+            portainer_PUID=1000
+            portainer_PGID=100
+            portainer_TZ=Europe/London
+            do_portainer
+        else
+            do_pre_up_options
         fi
+
+    fi
+
 }
 
 do_portainer(){
+
     pre_up_options=$(whiptail --notags --title "Bring up Portainer" --menu "" 20 78 8 "configure" "Configure environment variables" "start" "Start the service" 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
@@ -50,9 +62,11 @@ do_portainer(){
     else
         do_container
     fi
+
 }
 
 do_portainer_configure(){
+
     variable=$(whiptail --notags --title "Variables" --ok-button "Change" --cancel-button "Save and Back" --menu "" 20 100 10  \
     "PUID" "PUID" \
     "PGID" "PGID" \
@@ -124,9 +138,11 @@ do_portainer_configure(){
         __msg_debug "User selected Cancel. Return the pre-up menu. "
         do_portainer
     fi
+
 }
 
 do_portainer_up(){
+
     if [[ $(docker container ls -af name=portainer --format true) ]]; then
         docker start portainer
         if [ $? -ne 0 ]; then
@@ -145,9 +161,11 @@ do_portainer_up(){
             portainer_post_up_info="Portainer deployed \n\nPortainer image version: portainer-ce:${portainer_version}\nDefault username: admin\nDefault password: changeme\nThe portainer server address is ${portainer_url}."
         fi
    fi
+
 }
 
 do_portainer_ip(){
+
     if [[ ! -z "${SSH_CONNECTION}" ]]; then
       portainer_ip=$(echo $SSH_CONNECTION | awk '{print $3}')
       portainer_url="https://"${portainer_ip}":9443"
@@ -178,61 +196,95 @@ do_portainer_ip(){
          echo -e $W"Portainer server address: "$Y$portainer_url
       done 
    fi
+
 }
 
-# function that read all the env variables of a service from the .json file and concat them
+# Concatenates all environment variables in a docker compatible string "-e key=value -e key=value..."
 do_env_variable_concat(){
-    num_of_env=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env | length' ${DIR_CNF}/portainer_app_template.json)
-    __msg_debug "Getting Things Ready..."
-    env_full_list=$(
-        for (( n=0; n<$num_of_env; n++ ))
-        do
-            env_string=$(jq --arg service_to_start "$service_to_start" --argjson n "$n" '.templates[] | select(.title==$service_to_start) | .env[$n] |.name' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
-            env_value_string=$(jq --arg service_to_start "$service_to_start" --argjson n "$n" '.templates[] | select(.title==$service_to_start) | .env[$n] |.default' ${DIR_CNF}/portainer_app_template.json)
-            echo "-e ${env_string}=${env_value_string}" | tr '\n' ' '
-        done
-    )
-    env_full_list=$(echo ${env_full_list})
-    __msg_debug "The original env varialbe list:${env_full_list}"
+
+    env_full_list=""
+    for k in "${!service_env[@]}"
+    do
+        env_full_list+=" -e $k=${service_env[$k]}"
+    done
+
 }
 
-# function that read the env variable label to change from user input 
-do_choose_service_env(){
-    service_env_array=()
-    service_env=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env[] |.label' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
-    while read -r line; do
-        service_env_array+=("$line" "$line")
+# Reads the defined environment variables with their default values from the portainer JSON file for the current service
+do_get_service_env_defaults() {
+
+    if [ "$service_to_start" == "$service_name" ]; then
+        return
+    fi
+        
+    service_name=$service_to_start
+    for k in ${!service_env[@]}
+    do
+        unset service_env[$k]
+    done
+
+    service_env=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env[] | .name+"|"+.default' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    while read -r pair
+    do
+        local label=${pair%%|*}
+        local default=${pair#*|}
+        service_env["$label"]="$default"
     done <<< "$service_env"
+    unset service_env[0]
+
+    for k in "${!service_env[@]}"
+    do
+        __msg_debug "$k=${service_env[$k]}"
+    done
+
+}
+
+# Shows the existing environment variables and values and lets the user select one to change
+do_choose_service_env() {
+
+    service_env_array=()
+    for k in "${!service_env[@]}"
+    do
+        value=${service_env[$k]}
+        key=$(printf "%-25s %65s" $k "$value")
+        service_env_array+=("$k" "$key")
+    done
+
     # display whiptail menu listing out available services
     env_label_to_configure=$(whiptail --notags --title "Variables" --ok-button "Change" --cancel-button "Save and Back" --menu "Configure variables" 20 100 10 "${service_env_array[@]}" 3>&1 1>&2 2>&3) 
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
-        __msg_debug "The chosen variable is:" $env_label_to_configure
+        __msg_debug "Editing variable:" $env_label_to_configure
         do_change_service_env
     else
-        __msg_debug "User selected Cancel. Return to pre-up menu."
+        __msg_debug "User selected Save & Back. Return to pre-up menu."
         do_pre_up_options
     fi
+
 }
 
-# function that read the new env variable from user input and then replace it in the origianl $env_full_list
+# Show the user a form to change the environment variable
 do_change_service_env(){
-    env_variable_to_change_default=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | .default' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
-    __msg_debug $env_variable_to_change_default
-    env_variable_to_change_description=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | .description' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    
+    #env_variable_to_change_default=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.name==$env_label_to_configure) | .default' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    env_variable_to_change_default=${service_env[$env_label_to_configure]}
+    __msg_debug "Current value for $env_label_to_configure: $env_variable_to_change_default"
+    
     # concat the env description and env label if possible
+    env_variable_to_change_description=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.name==$env_label_to_configure) | .description' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
     if [ "$env_variable_to_change_description" != "null" ]; then
         env_variable_label_with_description="${env_label_to_configure}\n${env_variable_to_change_description}"
     else
         env_variable_label_with_description="${env_label_to_configure}"
     fi
+    
     # Check if there are options for the env value
-    options_exists_or_not=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | has("select")' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    options_exists_or_not=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.name==$env_label_to_configure) | has("select")' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
     if [[ $(echo ${options_exists_or_not}) == "true" ]] ; then
         # echo "found options" 
         # declare the options list array
         option_values_array=()
-        option_values=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | .select[].text ' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+        option_values=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.name==$env_label_to_configure) | .select[].text ' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
         __msg_debug "env_label_to_configure ${env_label_to_configure}"
         # append each options to the option_values_array
         while read -r line; do
@@ -241,7 +293,7 @@ do_change_service_env(){
         # display whiptail menu listing out available options
         value_changed_tmp=$(whiptail --notags --title "Please change the env values" --menu "Options" 20 100 10 "${option_values_array[@]}" 3>&1 1>&2 2>&3) 
         exitstatus=$?
-        value_changed_to_text=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" --arg value_changed_tmp "${value_changed_tmp}" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | .select[] | select(.text==$value_changed_tmp) |.value' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+        value_changed_to_text=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" --arg value_changed_tmp "${value_changed_tmp}" '.templates[] | select(.title==$service_to_start) | .env[] | select(.name==$env_label_to_configure) | .select[] | select(.text==$value_changed_tmp) |.value' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
         # echo "value_changed_to_text ${value_changed_to_text}"
         if [ $exitstatus != 0 ]; then
             do_choose_service_env
@@ -260,18 +312,22 @@ do_change_service_env(){
     fi
 }
 
-do_get_modified_env_list(){
-    # echo "The changing variable label is:${env_label_to_configure}" 
-    env_name_to_configure=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .env[] | select(.label==$env_label_to_configure) | .name ' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
-    new_env_pair=$(echo "${env_name_to_configure}=${value_changed_to_text}")
-    __msg_debug "new env pair: ${new_env_pair}"
-    # use a different delimiters # in sed to ger rid of the slash issue
-    env_full_list=$(echo ${env_full_list} | sed "s#${env_name_to_configure}*\S*#${new_env_pair}#")
-    __msg_debug "modified env full list is: ${env_full_list}"  
+# Modifies the required environment variable with a new value
+do_get_modified_env_list() {
+    
+    service_env[$env_label_to_configure]="${value_changed_to_text}"
+    __msg_debug "New value for $env_label_to_configure: ${value_changed_to_text}"
     do_choose_service_env
+    return
+    
 }
 
-do_pre_up_options(){
+# Main service menu, allows the user to modify its env variables or deploy the service
+do_pre_up_options() {
+    
+    # load defaults if we are in a new service
+    do_get_service_env_defaults
+    
     pre_up_options=$(whiptail --notags --title "Bring up ${service_to_start}" --menu "" 20 78 8 "configure" "Configure environment variables" "start" "Start the service" 3>&1 1>&2 2>&3)
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
@@ -285,7 +341,8 @@ do_pre_up_options(){
     fi
 }
 
-do_ask_for_confirmation(){
+# Ask user for confirmation before deploying the service
+do_ask_for_confirmation() {
     if (whiptail --title "Confirmation" --yesno "Do you wan to deploy ${service_to_start}?" 8 78); then
         __msg_debug "User selected to deploy ${service_to_start}."
         do_check_service_type
@@ -295,9 +352,20 @@ do_ask_for_confirmation(){
     fi
 }
 
-do_check_service_type(){
+# Gets a root property for a service from the Portainer JSON file
+do_get_property() {
+    local service=$1
+    local property=$2
+    local result=$(jq --arg service "${service}" --arg property "${property}" '.templates[] | select(.title==$service) | .[$property]' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    echo "$result"
+}
+
+do_check_service_type() {
+
     do_get_basic_info
-    service_type=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) |.type' ${DIR_CNF}/portainer_app_template.json)
+    do_env_variable_concat
+    
+    service_type="$(do_get_property "$service_to_start" type)"
     if [ $service_type == "1" ]; then
         tmp_name=$(echo $container_name | awk '{print $2}')
         CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep ${tmp_name})
@@ -339,50 +407,59 @@ do_check_service_type(){
 }
 
 do_get_basic_info(){
+
     # container image
-    container_image=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .image' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    container_image="$(do_get_property "$service_to_start" image)"
     __msg_debug "container_image ${container_image}"
+
     # container name
-    container_name=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .name' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    container_name="$(do_get_property "$service_to_start" name)"
     if [ "$container_name" != "null" ]; then
         container_name="--name ${container_name}"
     fi
     __msg_debug "container_name ${container_name}"
+
     # container restart policy
-    container_restart_policy=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .restart_policy' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    container_restart_policy="$(do_get_property "$service_to_start" restart_policy)"
     if [ "$container_restart_policy" != "null" ]; then
         container_restart_policy="--restart=unless-stopped"
     fi
     __msg_debug "container_restart_policy ${container_restart_policy}"
+
     # container network
-    container_network=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .network' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    container_network="$(do_get_property "$service_to_start" network)"
     if [ "$container_network" != "null" ]; then
         container_network="--net ${container_network}"
     fi   
     __msg_debug "container_network ${container_network}"
+
     # container hostname
-    container_hostname=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .hostname' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    container_hostname="$(do_get_property "$service_to_start" hostname)"
     if [ "$container_hostname" != "null" ]; then
         container_hostname="-h ${container_hostname}"
     fi   
     __msg_debug "container_hostname ${container_hostname}"
+
     # container privledged
-    container_privileged=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .privileged' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    container_privileged="$(do_get_property "$service_to_start" privileged)"
     if [ "$container_privileged" != "null" ]; then
         container_privileged="--privileged=true"
     fi   
     __msg_debug "container_privileged ${container_privileged}"
+
     # container volumes   
-    container_volumes=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .volumes' ${DIR_CNF}/portainer_app_template.json | tr -d '"[]\n\t[:blank:]' | sed "s/},{/ -v /g" | sed "s/bind://g" | sed "s/,container//g" | sed "s/auto://g"|tr -d '{}')
+    container_volumes="$(do_get_property "$service_to_start" volumes | tr -d '"[]\n\t[:blank:]' | sed "s/},{/ -v /g" | sed "s/bind://g" | sed "s/,container//g" | sed "s/auto://g"|tr -d '{}')"
     if [ "$container_volumes" != "null" ]; then
         container_volumes="-v ${container_volumes}"
     fi
     __msg_debug "container_volumes ${container_volumes}"
+
     # container command
-    container_command=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .command' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+    container_command="$(do_get_property "$service_to_start" command)"
     __msg_debug "container_command ${container_command}"
+
     # container port
-    container_ports=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .ports' ${DIR_CNF}/portainer_app_template.json | tr -d '"[][]\n\t[:blank:]' | sed "s/,/ -p /g")
+    container_ports="$(do_get_property "$service_to_start" ports | tr -d '"[][]\n\t[:blank:]' | sed "s/,/ -p /g")"
     if [ "$container_ports" != "null" ]; then
         container_ports="-p ${container_ports}"
     fi   
@@ -390,13 +467,16 @@ do_get_basic_info(){
 }
 
 do_docker_run(){
+    
     # Final step
     __msg_debug "${env_full_list}"
     docker_run_command="${env_full_list} ${container_restart_policy} ${container_network} ${container_hostname} ${container_privileged} ${container_volumes} ${container_ports} ${container_name} ${container_image} ${container_command}"
+    
     # remove unset env variables
     docker_run_command="docker run -d -e $(echo ${docker_run_command} | sed 's/null//g')"
     __msg_debug $docker_run_command
     eval $docker_run_command
+
 }
 
 do_docker_compose_up(){

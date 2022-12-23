@@ -20,7 +20,7 @@ org="xoseperez"
 repo="rakpios-cli"
 
 function __msg_debug(){
-    [[ "${DEBUG}" == "1" ]] && echo -e "[DEBUG]: $*"
+    [[ "${DEBUG}" == "1" ]] && echo -e "[DEBUG] $*"
 }
 
 # usage information
@@ -104,9 +104,9 @@ main() {
 
     # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
-        source ${DIR_LIB}/portainer-json-parser
-        source ${DIR_LIB}/rakpios-cli-network
-        source ${DIR_LIB}/rakpios-cli-service
+        source ${DIR_LIB}/rakpios-cli-network-manage
+        source ${DIR_LIB}/rakpios-cli-service-deploy
+        source ${DIR_LIB}/rakpios-cli-service-list
         do_check_for_update
         do_rakpios_cli_menu
     fi
@@ -133,8 +133,8 @@ do_print_install_location(){
 
 do_print_version(){
     LOCAL_VERSION_PATH="${DIR_CNF}/portainer_app_template.json"
-    if [ -f "$LOCAL_VERSION_PATH" ] && [ -d "${DIR_CNF}/.git" ]; then
-        __msg_debug  "Found configuration files saved in ${LOCAL_VERSION_PATH} and ${DIR_CNF}/.git"   
+    if [ -f "$LOCAL_VERSION_PATH" ] && [ -f "${DIR_CNF}/rakpios-cli.version" ]; then
+        __msg_debug  "Found configuration files saved in ${LOCAL_VERSION_PATH} and ${DIR_CNF}/rakpios-cli.version"   
         do_get_version_information
         echo "rakpios-cli version is ${local_version_rakpios_cli} (latest available version is ${remote_version_rakpios_cli})"
         echo "service version is ${local_version_portainer_json} (latest available version is ${remote_version_portainer_json}) "
@@ -188,9 +188,11 @@ do_fresh_install() {
 
     if git clone --quiet https://github.com/${org}/${repo}.git ${DIR_TMP}/; then
         __msg_debug "Download completed"
-        cp -r ${DIR_TMP}/lib/* ${DIR_LIB}                   #copy module files
-        cp -r ${DIR_TMP}/.git ${DIR_CNF}/.git               #copy configuration files
-        cp ${DIR_TMP}/rakpios-cli ${DIR_BIN}/rakpios-cli    #copy the rakpios-cli main script
+        pushd ${DIR_TMP}
+        cp -r lib/* ${DIR_LIB}                   #copy module files
+        cp rakpios-cli ${DIR_BIN}/rakpios-cli    #copy the rakpios-cli main script
+        git tag --sort=committerdate | tail -1 > ${DIR_CNF}/rakpios-cli.version
+        popd
         __msg_debug "Tool copy completed"
         echo "Download successful"
     else
@@ -297,7 +299,7 @@ do_get_version_information() {
 
     REMOTE_VERSION_URL_portainer_json="https://raw.githubusercontent.com/RAKWireless/portainer-templates/master/portainer_app_template.json"
     LOCAL_VERSION_PATH="${DIR_CNF}/portainer_app_template.json"
-    if [ -f "$LOCAL_VERSION_PATH" ] && [ -d "${DIR_CNF}/.git" ]; then
+    if [ -f "$LOCAL_VERSION_PATH" ] && [ -f "${DIR_CNF}/rakpios-cli.version" ]; then
         
         # use portainer json key value to track the service version
         remote_version_portainer_json=$(curl -s $REMOTE_VERSION_URL_portainer_json | jq '.version_for_rakpios_cli' | tr -d '"')
@@ -307,9 +309,7 @@ do_get_version_information() {
         remote_version_rakpios_cli=$(curl https://api.github.com/repos/${org}/${repo}/releases/latest -s | jq .tag_name -r)
         
         # retrieve the local git tag
-        pushd ${DIR_CNF}
-        local_version_rakpios_cli=$(git tag --sort=committerdate | tail -1)
-        popd
+        local_version_rakpios_cli=$(cat ${DIR_CNF}/rakpios-cli.version)
 
     else
         __msg_debug "Can not found Portainer and rakpios-cli configuration files."

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-do_command()
-{
+do_command() {
+	
 	STATUS=$(docker ps -a --format '{{.Names}}\t{{.Status}}' | grep $CONTAINER_NAME | awk '{ print $2 }')
     CMD=$(whiptail --notags --title "$CONTAINER_NAME" --menu "" 15 60 3 \
         	"start" "Start The Service" \
@@ -43,18 +43,22 @@ do_command()
 	fi
 }
 
-do_service_menu()
-{
+do_service_menu() {
+	
 	SERVICES=$(docker ps -a --format '{{.Names}}' | sort -k1)
 	list=()	
 	for service in $SERVICES; do
 		list+="$service $service "
     done
-	
-	CONTAINER_NAME=$(whiptail --notags --title "Service List" --menu "" 15 60 4 $list 3>&1 1>&2 2>&3)
+	__msg_debug "List of running services: [$list]"
 
-	if [ ! -z $CONTAINER_NAME ]; then
-		do_command
+	if [ "$list" == "" ]; then
+		whiptail --msgbox "There are no running services" 10 60
+	else
+		CONTAINER_NAME=$(whiptail --notags --title "Service List" --menu "" 15 60 4 $list 3>&1 1>&2 2>&3)
+		if [ ! -z $CONTAINER_NAME ]; then
+			do_command
+		fi
 	fi
 
 }
