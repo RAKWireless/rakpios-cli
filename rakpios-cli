@@ -16,7 +16,7 @@ DIR_BIN="${HOME}/.local/bin"
 DIR_LIB="${HOME}/.local/lib/rakpios-cli"
 DIR_CNF="${HOME}/.config/rakpios-cli"
 
-org="xoseperez"
+org="RAKWireless"
 repo="rakpios-cli"
 
 function __msg_debug(){
