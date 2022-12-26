@@ -3,10 +3,10 @@
 do_command() {
 	
 	STATUS=$(docker ps -a --format '{{.Names}}\t{{.Status}}' | grep $CONTAINER_NAME | awk '{ print $2 }')
-    CMD=$(whiptail --notags --title "$CONTAINER_NAME" --menu "" 15 60 3 \
-        	"start" "Start The Service" \
-        	"stop" "Stop The Service" \
-        	"remove" "Remove The Service" \
+    CMD=$(whiptail --notags --title "$CONTAINER_NAME" --menu "" 15 60 4 \
+        	"start" "Start the service" \
+        	"stop" "Stop the service" \
+        	"remove" "Remove the service" \
         	3>&1 1>&2 2>&3)
 
 	if [ -z $CMD ]; then

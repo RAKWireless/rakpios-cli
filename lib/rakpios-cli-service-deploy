@@ -8,7 +8,7 @@
 declare -A service_env
 declare service_name
 
-# function that choose the service to deploy
+# List services
 do_select_service(){
 
     # get the list of available services
@@ -29,7 +29,7 @@ do_select_service(){
     exitstatus=$?
     if [ $exitstatus = 0 ]; then
         
-        __msg_debug "The chosen service is:" $service_to_start
+        __msg_debug "Select service:" $service_to_start
         
         # the Portainer's template is not in the .json file, so no need to parse the json for Portainer
         if [[ $service_to_start == "Portainer" ]] ; then 
@@ -49,7 +49,11 @@ do_select_service(){
 
 }
 
-do_portainer(){
+#------------------------------------------------------------------------------
+# Portainer specific methods
+#------------------------------------------------------------------------------
+
+do_portainer() {
 
     pre_up_options=$(whiptail --notags --title "Bring up Portainer" --menu "" 20 78 8 "configure" "Configure environment variables" "start" "Start the service" 3>&1 1>&2 2>&3)
     exitstatus=$?
@@ -198,6 +202,10 @@ do_portainer_ip(){
    fi
 
 }
+
+#------------------------------------------------------------------------------
+# Generic services
+#------------------------------------------------------------------------------
 
 # Concatenates all environment variables in a docker compatible string "-e key=value -e key=value..."
 do_env_variable_concat(){
@@ -371,7 +379,6 @@ do_check_service_type() {
         CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep ${tmp_name})
         if [ -z $CONTAINER_NAME ]; then
             do_docker_run
-            do_print_post_up_info
         else
             whiptail --title "Notes" --msgbox  "$CONTAINER_NAME already exists." 10 60
             do_command
@@ -383,7 +390,6 @@ do_check_service_type() {
         popd  >> /dev/null
         if [ -z $tmp_name_list ]; then
             do_docker_compose_up
-            do_print_post_up_info
         else
             exist=0
             for tmp_name in $tmp_name_list; do
@@ -400,7 +406,6 @@ do_check_service_type() {
 
             if [ "$exist" == "0" ]; then
                 do_docker_compose_up
-                do_print_post_up_info
             fi
         fi
     fi
@@ -466,49 +471,87 @@ do_get_basic_info(){
     __msg_debug "container_ports ${container_ports}"    
 }
 
-do_docker_run(){
+do_docker_run() {
     
-    # Final step
-    __msg_debug "${env_full_list}"
+    # Build command
     docker_run_command="${env_full_list} ${container_restart_policy} ${container_network} ${container_hostname} ${container_privileged} ${container_volumes} ${container_ports} ${container_name} ${container_image} ${container_command}"
     
-    # remove unset env variables
+    # Remove unset env variables
     docker_run_command="docker run -d -e $(echo ${docker_run_command} | sed 's/null//g')"
+    
+    # Evaluate
     __msg_debug $docker_run_command
     eval $docker_run_command
+    response=$?
+
+    if [ $response -ne 0 ]; 
+    then
+        whiptail --msgbox "Error bringing up the service" 10 60
+    else
+        do_print_post_up_info
+    fi
+
+    echo $response
 
 }
 
-do_docker_compose_up(){
-    # Final step
-    yml_file_path="./$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' ${DIR_CNF}/portainer_app_template.json | tr -d '"')"
-    #yml_file_path="./${yml_file_path}"
+do_docker_compose_up() {
+    
+    # Get yaml path
+    yml_file_path=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+
+    # Build command
     docker_compose_env_list="$(echo ${env_full_list} | sed 's/-e //g')"
-    docker_compose_command="${docker_compose_env_list} docker compose -f ${yml_file_path} up -d"
+    docker_compose_command="${docker_compose_env_list} docker compose -f ./${yml_file_path} up -d"
+    
+    # Evaluate
     __msg_debug $docker_compose_command
     pushd ${DIR_CNF}
     eval $docker_compose_command
+    response=$?
     popd
+
+    # Check output
+    if [ $response -ne 0 ]; 
+    then
+        whiptail --msgbox "Error bringing up the service" 10 60
+    else
+        do_print_post_up_info
+    fi
+
+    echo $response
+
 }
 
-do_print_post_up_info(){
-    post_up_info="$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .post_up_info' ${DIR_CNF}/portainer_app_template.json | tr -d '"')"
+do_print_post_up_info() {
+    
+    # Get post-up information
+    post_up_info=$(do_get_property "$service_to_start" post_up_info)
+
+    # Show Gateway EUI for packet forwarders
     if [[ $service_to_start == "LoRa Basics™ Station for Docker" ]] || [[ $service_to_start == "UDP Packet Forwarder" ]] || [[ $service_to_start == "2.4GHz Gateway UDP Packet Forwarder" ]]; then
-        container_name_raw=$(jq --arg service_to_start "$service_to_start" --arg env_label_to_configure "$env_label_to_configure" '.templates[] | select(.title==$service_to_start) | .name' ${DIR_CNF}/portainer_app_template.json | tr -d '"')
+        container_name_raw=$(do_get_property "$service_to_start" name)
         docker_container_id=$(docker ps -aqf name=${container_name_raw})
         GATEWAY_EUI=$(docker exec -it ${container_name_raw} ./get_eui.sh | tr -cd  '[a-zA-Z][0-9]'|sed s/GatewayEUI//)
         whiptail --title "Notes" --msgbox "Container id : $docker_container_id \nGateway EUI  : $GATEWAY_EUI \n \n$post_up_info" 30 78
+    
+    # Portainer post-up
     elif [[ $service_to_start == "portainer" ]] ; then
         whiptail --title "Notes" --msgbox  "$portainer_post_up_info" 30 78 
+    
+    # The rest
     else
         whiptail --title "Notes" --msgbox  "$post_up_info" 30 78 
     fi
 
 }
 
-do_container(){
+# -----------------------------------------------------------------------------
+# Main entry point
+# -----------------------------------------------------------------------------
+
+do_container() {
     do_select_service
-    #do_print_post_up_info
 }
 
 # if [ $(id -u) -ne 0 ]; then
