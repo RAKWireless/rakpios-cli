@@ -8,11 +8,11 @@ Users can use remote bash execution script to install/upgrade rakpios-cli.
 
 To install:
 
-`curl https://raw.githubusercontent.com/RAKWireless/rakpios-cli/main/rakpios-cli -sSf | bash -s -- --install && source ~/.profile`
+`curl https://raw.githubusercontent.com/RAKWireless/rakpios-cli/main/rakpios-cli -sSf | bash -s -- --install --silent && source ~/.profile`
 
 To update:
 
-`curl https://raw.githubusercontent.com/RAKWireless/rakpios-cli/main/rakpios-cli -sSf | bash -s -- --upgrade && source ~/.profile`
+`curl https://raw.githubusercontent.com/RAKWireless/rakpios-cli/main/rakpios-cli -sSf | bash -s -- --upgrade --silent && source ~/.profile`
 
 After the installation/upgrade is finished, users can use the command `rakpios-cli` to launch this tool. To display help infomation, please add the flag `--help` or `-h`
 
@@ -27,6 +27,7 @@ FLAGS:
     -h, --help              Prints help information
     -i, --install           Install rakpios-cli
     -u, --upgrade           Upgrade rakpios-cli
+    -s, --silent            Perform install/update silently (no user interaction)
     -v, --version           Prints version information
 ```
 

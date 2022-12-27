@@ -9,6 +9,7 @@
 INSTALL=0
 UPGRADE=0
 DEBUG=0
+SILENT=0
 CONFIG_FILE=0
 
 DIR_TMP="${HOME}/.cache/rakpios-cli"
@@ -35,6 +36,7 @@ FLAGS:
     -h, --help              Prints help information
     -i, --install           Install rakpios-cli
     -u, --upgrade           Upgrade rakpios-cli
+    -s, --silent            Perform install/update silently (no user interaction)
     -v, --version           Prints version information
 EOF
 }
@@ -42,16 +44,8 @@ EOF
 
 main() {
     
-    # check for necessary tools
-    need_cmd curl
-    need_cmd jq
-    need_cmd unzip
-    need_cmd whiptail
-    need_cmd network-manager
-    # docker will be checkd separately
-
-    SHORT=i,u,d,h,v
-    LONG=install,upgrade,debug,help
+    SHORT=i,u,d,h,v,s
+    LONG=install,upgrade,debug,help,version,silent
     OPTS=$(getopt --options $SHORT --longoptions $LONG -- "$@")
 
     if [ $? -ne 0 ]; then
@@ -66,6 +60,10 @@ main() {
         case $1 in
             -d | --debug) # Prints debug message
                 DEBUG=1
+                shift
+                ;;
+            -s | --silent) # Forces update without asking
+                SILENT=1
                 shift
                 ;;
             -h | --help) # Prints help information
@@ -92,15 +90,18 @@ main() {
         esac
     done
 
-    if [ "$INSTALL" == "1" ]; then
-        do_check_install_status
+    if [ "$INSTALL" == "1" ] || [ "$UPGRADE" == "1" ]; then
+        do_install
         exit 0
     fi
 
-    if [ "$UPGRADE" == "1" ]; then
-        do_upgrade
-        exit 0
-    fi
+    # check for necessary tools
+    need_cmd curl
+    need_cmd jq
+    need_cmd unzip
+    need_cmd whiptail
+    need_cmd network-manager
+    # docker will be checkd separately
 
     # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
@@ -112,19 +113,32 @@ main() {
     fi
 }
 
-do_check_install_status(){
-    if test -f "${DIR_BIN}/rakpios-cli"; then
-        whiptail --title "Confirmation" --yesno "Looks like rakpios-cli is already installed. \nDo you want to upgrade the rakpios-cli to the latest version?" 10 78 --yes-button "Yes" --no-button "No" 
-        if [[ $? -eq 0 ]]; then 
-            do_upgrade
-        elif [[ $? -eq 1 ]]; then 
-            exit 0
-        fi    
-    else
-        do_fresh_install
-        # echo "rakpios-cli successfully installed!"
-        whiptail --msgbox "rakpios-cli successfully installed!" 10 60
-    fi 
+do_install() {
+    
+    # Check if installing on top of existing version
+    if [ $SILENT -eq 0 ]; then
+        if [ $INSTALL -eq 1 ]; then
+            if test -f "${DIR_BIN}/rakpios-cli"; then
+                whiptail --title "Confirmation" --yesno "Looks like rakpios-cli is already installed. \nDo you want to upgrade the rakpios-cli to the latest version?" 10 78 --yes-button "Yes" --no-button "No" 
+                if [[ $? -eq 1 ]]; then 
+                    exit 0
+                fi    
+            fi
+        fi
+    fi
+    
+    # Install
+    do_fresh_install
+    
+    # Show message
+    if [ $SILENT -eq 0 ]; then
+        if [ $INSTALL -eq 1 ]; then
+            whiptail --msgbox "rakpios-cli successfully installed!" 10 60
+        else
+            whiptail --msgbox "rakpios-cli successfully updated!" 10 60
+        fi
+    fi
+
 }
 
 do_print_install_location(){
@@ -144,18 +158,7 @@ do_print_version(){
 }
 
 do_clean_up(){
-    # remove the rakpios-cli tool and configurations
-    if [ -d "${DIR_TMP}" ] || [ -f "${DIR_BIN}/rakpios-cli" ] || [ -d "${DIR_LIB}" ] || [ -d "${DIR_CNF}" ]; then
-        rm -rf ${DIR_TMP} ${DIR_BIN}/rakpios-cli ${DIR_LIB} ${DIR_CNF}
-    fi
-}
-
-do_upgrade(){
-    do_clean_up
-    # install the latest rakpios-cli
-    do_fresh_install
-    whiptail --msgbox "rakpios-cli successfully updated to the latest version!" 10 60
-    exit 0
+    rm -rf ${DIR_TMP} ${DIR_BIN}/rakpios-cli ${DIR_LIB} ${DIR_CNF}
 }
 
 # Check install directory
