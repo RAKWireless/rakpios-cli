@@ -142,7 +142,7 @@ do_install() {
 }
 
 do_print_install_location(){
-    __msg_debug "The rakpios-cli will be installed in the ${DIR_BIN},${DIR_LIB},and ${DIR_CNF}"
+    __msg_debug "The rakpios-cli will be installed in the ${DIR_BIN}, ${DIR_LIB} and ${DIR_CNF}"
 }
 
 do_print_version(){
