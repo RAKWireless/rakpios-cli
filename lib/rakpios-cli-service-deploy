@@ -355,10 +355,36 @@ do_docker_compose_up() {
 
 }
 
+do_get_host_ip() {
+
+    if [[ ! -z "${RAKPIOS_HOST}" ]]; then
+        HOST_IP=${RAKPIOS_HOST}
+    else
+        SHOW_IP_PATTERN="^bond.*|^[ewr].*|^br.*|^lt.*|^umts.*|^lan.*"
+        ips=()
+        docker_br_intf=`docker network ls -f driver=bridge --format "br-{{.ID}}"`  #docker bridge network interface
+        for f in /sys/class/net/*; do
+            intf=$(basename $f)
+            # match only interface names starting with e (Ethernet), br (bridge), w (wireless), r (some Ralink drivers use>
+            # and get rid of bridge interface created by docker
+            if ([[ $intf =~ $SHOW_IP_PATTERN ]] && !([[ $docker_br_intf =~ $intf ]])) then
+                tmp=$(ip -4 addr show dev $intf | awk '/inet/ {print $2}' | cut -d'/' -f1)
+            [[ -n $tmp ]] && ips+=("$tmp")
+            fi
+        done
+        # The IP of the first enabled interface
+        HOST_IP=${ips[0]}
+    fi
+}
+
 do_print_post_up_info() {
     
     # Get post-up information
     post_up_info=$(do_get_property "$service_to_start" post_up_info)
+    
+    # Get current host ip and replace the {host-ip} placeholder in the post-up info
+    do_get_host_ip
+    post_up_info=$(echo $post_up_info | sed s/{host-ip}/${HOST_IP}/)
 
     # Show Gateway EUI for packet forwarders
     if [[ $service_to_start == "LoRa Basics™ Station for Docker" ]] || [[ $service_to_start == "UDP Packet Forwarder" ]] || [[ $service_to_start == "2.4GHz Gateway UDP Packet Forwarder" ]]; then
