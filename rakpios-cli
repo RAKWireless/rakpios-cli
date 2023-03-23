@@ -95,13 +95,7 @@ main() {
         exit 0
     fi
 
-    # check for necessary tools
-    need_cmd curl
-    need_cmd jq
-    need_cmd unzip
-    need_cmd whiptail
-    need_cmd network-manager
-    # docker will be checkd separately
+    do_check_dependencies
 
     # start the rakpios-cli if no options is passed to the script
     if (( $OPTIND == 1 )); then
@@ -111,6 +105,17 @@ main() {
         do_check_for_update
         do_rakpios_cli_menu
     fi
+}
+
+do_check_dependencies() {
+    # check for necessary tools
+    need_cmd curl
+    need_cmd jq
+    need_cmd unzip
+    need_cmd whiptail
+    need_cmd network-manager
+    need_cmd tmux
+    # docker will be checkd separately
 }
 
 do_install() {
@@ -176,7 +181,7 @@ do_check_directory() {
 }
 
 do_fresh_install() {
-    
+    do_check_dependencies
     # print install location
     do_clean_up
     do_print_install_location
@@ -275,7 +280,9 @@ need_cmd() {
         echo "need '$1' (command not found)"
         apt install $1 -y
     fi
-
+    if [[ $1 == "tmux" ]]; then
+        echo -e "set-option -g mouse on\nbind-key -n C-C confirm-before kill-session" >~/.tmux.conf
+    fi
 }
 
 # function to check whether command is installed or not
