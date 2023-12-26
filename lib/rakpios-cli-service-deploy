@@ -390,6 +390,7 @@ do_print_post_up_info() {
     if [[ $service_to_start == "LoRa Basics™ Station for Docker" ]] || [[ $service_to_start == "UDP Packet Forwarder" ]] || [[ $service_to_start == "2.4GHz Gateway UDP Packet Forwarder" ]]; then
         container_name_raw=$(do_get_property "$service_to_start" name)
         docker_container_id=$(docker ps -aqf name=${container_name_raw})
+        sleep 5
         GATEWAY_EUI=$(docker exec -it ${container_name_raw} ./get_eui.sh | tr -cd  '[a-zA-Z][0-9]'|sed s/GatewayEUI//)
         whiptail --title "Notes" --msgbox "Container id : $docker_container_id \nGateway EUI  : $GATEWAY_EUI \n \n$post_up_info" 30 78
     
