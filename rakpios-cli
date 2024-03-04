@@ -199,7 +199,7 @@ do_fresh_install() {
         pushd ${DIR_TMP}
         cp -r lib/* ${DIR_LIB}                   #copy module files
         cp rakpios-cli ${DIR_BIN}/rakpios-cli    #copy the rakpios-cli main script
-        git tag --sort=committerdate | tail -1 > ${DIR_CNF}/rakpios-cli.version
+        git tag -l --sort=v:refname | tail -1 > ${DIR_CNF}/rakpios-cli.version
         popd
         __msg_debug "Tool copy completed"
         echo "Download successful"
