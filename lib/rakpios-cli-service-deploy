@@ -77,7 +77,8 @@ do_choose_service_env() {
 
     service_env_array=()
     
-    for k in "${!service_env[@]}"
+    IFS=$'\n' keys=($(sort -n <<<"${!service_env[@]}"))
+    for k in "${keys[@]}"
     do
         value=${service_env[$k]}
         key=$(printf "%-25s %65s" "$k" "$value")
