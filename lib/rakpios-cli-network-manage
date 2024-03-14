@@ -2,13 +2,15 @@
 
 do_configure_dhcp()
 {
-	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
+	
+	local NAME=$1
+	FILE="/etc/NetworkManager/system-connections/$NAME.nmconnection"
 	
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-		if [ -e $FILE ]; then
-			sudo nmcli connection modify filename $FILE ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
-			RET=$(sudo nmcli connection up filename $FILE 2>&1)
+		if [ -e "$FILE" ]; then
+			sudo nmcli connection modify filename "$FILE" ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
+			RET=$(sudo nmcli connection up filename "$FILE" 2>&1)
 			whiptail --title "Notes" --msgbox  "$RET" 10 60			
 		fi
 	else		
@@ -19,30 +21,31 @@ do_configure_dhcp()
 do_configure_static()
 {
 
-	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
+	local NAME=$1
+	FILE="/etc/NetworkManager/system-connections/$NAME.nmconnection"
 
 	IP=$(whiptail --inputbox "input IP address/prefix" 10 60 "192.168.240.100/24" --title "IP address" 3>&1 1>&2 2>&3)
-	if [ -z $IP ]; then
+	if [ -z "$IP" ]; then
 		clear
 		return 0
 	fi
 	GW=$(whiptail --inputbox "input Gateway address" 10 60 "192.168.240.1" --title "gateway address" 3>&1 1>&2 2>&3)
-    if [ -z $GW ]; then
+    if [ -z "$GW" ]; then
 		clear
 		return 0
 	fi
 	DNS=$(whiptail --inputbox "input dns server address" 10 60 "8.8.8.8" --title "gateway address" 3>&1 1>&2 2>&3)
-	if [ -z $DNS]; then
+	if [ -z "$DNS" ]; then
 		clear
 		return 0
 	fi
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then    					
-		if [ -e $FILE ]; then
-			sudo nmcli connection modify filename $FILE ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual
+		if [ -e "$FILE" ]; then
+			sudo nmcli connection modify filename "$FILE" ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
 		else
-			sudo nmcli connection add con-name $1 ifname $1 type ethernet ipv4.addresses $IP ipv4.gateway $GW ipv4.dns $DNS ipv4.method manual			
+			sudo nmcli connection add con-name "$NAME" ifname "$NAME" type ethernet ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual			
 		fi
-		RET=$(sudo nmcli connection up filename $FILE 2>&1)
+		RET=$(sudo nmcli connection up filename "$FILE" 2>&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 	else
     	return 0
@@ -51,14 +54,13 @@ do_configure_static()
 
 do_configure_ethernet()
 {
-	IFACES=$(cat /proc/net/dev | tail -n+3 | cut -d ":" -f1 | sed 's/ //g' | grep -E '^eth|^en')
+	IFACES=$( tail -n+3 < /proc/net/dev | cut -d ":" -f1 | sed 's/ //g' | grep -E '^eth|^en' )
 	iface_list=()
     while read -r line; do
         iface_list+=("$line" "$line")
     done <<< "$IFACES"
 
-	IFACE=$(whiptail --notags --title " CONFIGURE ETHERNET" --menu "Select Interface:" 15 60 4 ${iface_list[@]}\
-                3>&1 1>&2 2>&3)
+	IFACE=$( whiptail --notags --title " CONFIGURE ETHERNET" --menu "Select Interface:" 15 60 4 "${iface_list[@]}" 3>&1 1>&2 2>&3 )
     RET=$?
 	
 	if [ $RET -eq 1 ]; then
@@ -76,8 +78,8 @@ do_configure_ethernet()
                 return 0
 		elif [ $RET -eq 0 ]; then
 			case "$ADDR" in
-        	1) do_configure_dhcp $IFACE;;
-        	2) do_configure_static $IFACE;;
+        	1) do_configure_dhcp "$IFACE";;
+        	2) do_configure_static "$IFACE";;
         	esac
 		fi
     fi
@@ -85,104 +87,124 @@ do_configure_ethernet()
 
 do_wifi_ap()
 {
-	SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
-
-	if [ -z $SSID ]; then
-		clear
-		return 0
-	fi
-
-	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
 	
-	RET=$?
-	if [ -z $PASSWD ]; then
+	local IFACE=$1
+
+	# Ask the user for the SSID of the new AP
+	SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
+	if [ -z "$SSID" ]; then
 		clear
 		return 0
 	fi
 
-	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
+	# Set a password
+	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
+	RET=$?
+	if [ -z "$PASSWD" ]; then
+		clear
+		return 0
+	fi
+
+	# Ask for confirmation
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
-		if [ -e $FILE ]; then
-			sudo nmcli connection modify filename $FILE wifi.mode ap wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
-		else
-			sudo nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID mode ap 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD ipv4.method shared ipv4.addresses 192.168.230.1/24
+	
+		FILE="/etc/NetworkManager/system-connections/$SSID.nmconnection"
+        if [ -e "$FILE" ]; then
+			nmcli c del "$FILE"
 		fi
-		RET=$(sudo nmcli connection up filename $FILE 2<&1)
+		
+		sudo nmcli con add type wifi ifname "$IFACE" con-name "$SSID" autoconnect yes ssid "$SSID"
+		sudo nmcli con modify "$SSID" 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared
+		sudo nmcli con modify "$SSID" wifi-sec.key-mgmt wpa-psk
+		sudo nmcli con modify "$SSID" wifi-sec.psk "$PASSWD"
+
+		RET=$(sudo nmcli con up "$SSID" 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 
-	else
-		return 0
 	fi
+
 }
 
 do_wifi_sta()
 {
-	FUN=$(whiptail --menu "Configure SSID:" 15 60 4 "1" "Select SSID from scan list" "2" "Enter SSID manually" 3>&1 1>&2 2>&3)
-	RET=$?
+	
+	local IFACE=$1
 
+	# Ask the user whether she wants to choose from a list of SSID or enter one manually
+	FUN=$(whiptail --menu "Configure SSID:" 15 60 4 "1" "Select SSID from scan list" "2" "Enter SSID manually" 3>&1 1>&2 2>&3)
+	
+	# User cancelled
+	RET=$?
 	if [ $RET -eq 1 ]; then
 		clear
 		return 0
-	elif [ $RET -eq 0 ]; then
-    	case "$FUN" in
-			1)
-            SSID_LIST=$(sudo nmcli device wifi list | tail -n +2 | awk '{print $2}' | sed 's/--//g')
-            while read -r line; do
-        		ssid_list+=("$line" "$line")
-    		done <<< "$SSID_LIST"
-
-    		SSID=$(whiptail --notags --menu "Scan List:" 15 60 4 ${ssid_list[@]} 3>&1 1>&2 2>&3)
-			
-			if [ -z $SSID ]; then
-				clear
-				return 0
-			fi
-			;;
-			2)
-			SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
-			
-			if [ -z $SSID ]; then
-				clear
-				return 0
-			fi
-			;;
-		esac
 	fi
 
+	case "$FUN" in
+		
+		1)
+		
+			# Get list of SSIDs
+			SSID_LIST=$( sudo nmcli -f SSID device wifi list | tail -n +2 | grep -v "\-\-" | sort -u )
+			while read -r line; do
+				ssid_list+=("$line" "$line")
+			done <<< "${SSID_LIST[@]}"
+			
+			# Let the user choose
+			SSID=$(whiptail --notags --menu "Scan List:" 15 60 4 "${ssid_list[@]}" 3>&1 1>&2 2>&3)
+			if [ -z "$SSID" ]; then
+				clear
+				return 0
+			fi
+			;;
+
+		2)
+			
+			# Ask the user the SSID to connect to
+			SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
+			if [ -z "$SSID" ]; then
+				clear
+				return 0
+			fi
+			;;
+
+	esac
+
+	# Ask the user the passphrase for the SSID
 	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
-	
-	if [ -z $PASSWD ]; then
+	if [ -z "$PASSWD" ]; then
 		clear
 		return 0
 	fi
-	FILE="/etc/NetworkManager/system-connections/$1.nmconnection"
-   
-	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-        if [ -e $FILE ]; then
-            sudo nmcli connection modify filename $FILE wifi.mode '' wifi.ssid $SSID wifi-sec.psk $PASSWD ipv4.method auto ipv4.addresses '' 
+	# Ask for confirmation
+	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
+		
+		FILE="/etc/NetworkManager/system-connections/$SSID.nmconnection"
+		if [ -e "$FILE" ]; then
+			sudo nmcli connection modify filename "$FILE" wifi.mode '' wifi.ssid "$SSID" wifi-sec.psk "$PASSWD" ipv4.method auto ipv4.addresses '' 
 		else
-			sudo nmcli connection add con-name $1 ifname $1 type wifi ssid $SSID 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk $PASSWD			
-        fi
-		RET=$(sudo nmcli connection up filename $FILE 2<&1)
+			sudo nmcli connection add con-name "$SSID" ifname "$IFACE" type wifi ssid "$SSID" 802-11-wireless-security.key-mgmt wpa-psk 802-11-wireless-security.psk "$PASSWD"
+		fi
+		
+		sudo nmcli connection reload
+		RET=$(sudo nmcli connection up "$SSID" 2<&1)
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
 
-    else
-        return 0
     fi
+
 }
 
 do_configure_wifi()
 {
     
-    IFACES=$(cat /proc/net/dev | tail -n+3 | cut -d ":" -f1 | sed 's/ //g' | grep -E '^wl')
+    IFACES=$( tail -n+3 < /proc/net/dev | cut -d ":" -f1 | sed 's/ //g' | grep -E '^wl' )
     iface_list=()
     while read -r line; do
         iface_list+=("$line" "$line")
     done <<< "$IFACES"
 
-	IFACE=$(whiptail --notags --title " Configure WIFI" --menu "Select Interface:" 15 60 4 ${iface_list[@]}\
-                3>&1 1>&2 2>&3)
+	IFACE=$(whiptail --notags --title " Configure WIFI" --menu "Select Interface:" 15 60 4 "${iface_list[@]}" 3>&1 1>&2 2>&3)
 	RET=$?
 
     if [ $RET -eq 1 ]; then
@@ -190,8 +212,8 @@ do_configure_wifi()
                 return 0
     elif [ $RET -eq 0 ]; then
 		FUN=$(whiptail --title "Configure WIFI" --menu "Select WIFI mode:" 15 60 4 \
-                1 "AP mode" \
-                2 "STA mode" \
+                1 "Client mode" \
+                2 "Acces Point mode" \
                 3>&1 1>&2 2>&3)
 		RET=$?
 
@@ -200,8 +222,8 @@ do_configure_wifi()
                 return 0
     	elif [ $RET -eq 0 ]; then
         	case "$FUN" in
-				1) do_wifi_ap $IFACE;;
-        		2) do_wifi_sta $IFACE;;
+        		1) do_wifi_sta "$IFACE";;
+				2) do_wifi_ap "$IFACE";;
 			esac
 		fi
 	fi
@@ -211,7 +233,7 @@ do_configure_lte()
 {
 	APN=$(whiptail --inputbox "Please enter APN" 10 60 --title "APN" 3>&1 1>&2 2>&3)
 	
-	if [ -z $APN ]; then
+	if [ -z "$APN" ]; then
 		clear
 		return 0
 	fi
@@ -220,18 +242,18 @@ do_configure_lte()
 	FILE="/etc/NetworkManager/system-connections/gsm.nmconnection"
     if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-        if [ -e $FILE ]; then
+        if [ -e "$FILE" ]; then
 	
 			if [ -z "$PIN" ]; then
-				sudo nmcli connection modify filename $FILE gsm.apn $APN gsm.pin ''
+				sudo nmcli connection modify filename "$FILE" gsm.apn "$APN" gsm.pin ''
 			else
-				sudo nmcli connection modify filename $FILE gsm.apn $APN gsm.pin $PIN
+				sudo nmcli connection modify filename "$FILE" gsm.apn "$APN" gsm.pin "$PIN"
 			fi
 		else
 			if [ -z "$PIN" ]; then
-				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn $APN 
+				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn "$APN" 
 			else
-				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn $APN gsm.pin $PIN
+				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn "$APN" gsm.pin "$PIN"
 			fi
         fi
 		RET=$(sudo nmcli connection up gsm 2<&1)
