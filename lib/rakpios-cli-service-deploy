@@ -78,6 +78,7 @@ do_choose_service_env() {
     service_env_array=()
     
     IFS=$'\n' keys=($(sort -n <<<"${!service_env[@]}"))
+    unset IFS
     for k in "${keys[@]}"
     do
         value=${service_env[$k]}
@@ -399,12 +400,3 @@ do_print_post_up_info() {
 do_container() {
     do_select_service
 }
-
-# if [ $(id -u) -ne 0 ]; then
-#   printf "Script must be run as root. Try 'sudo ./portainer-json-parser'\n"
-#   exit 1
-# fi
-
-#do_container
-
-

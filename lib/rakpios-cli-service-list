@@ -56,7 +56,6 @@ do_command() {
 					docker stop "$CONTAINER_NAME" > /dev/null
 				else
 					docker compose -p "$CONTAINER_NAME" stop
-
 				fi
 				if [ $? -eq 0 ]; then
 					# __msg_debug "docker compose stop ran successfully"
@@ -139,5 +138,3 @@ do_service_menu() {
 
 	fi
 }
-
-# do_service_menu

@@ -285,10 +285,3 @@ do_network_main_menu()
 	fi
 
 }
-
-# if [ $(id -u) -ne 0 ]; then
-# 	printf "Script must be run as root. Try 'sudo ./whiptail_network_config'\n"
-#   	exit 1
-# fi
-
-# do_main_menu
