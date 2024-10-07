@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (2024-10-07)
+
+* Fix installation issue when $HOME/.local/lib not existing
+
 ## 0.1.2 (2024-03-14)
 
 * Code maintenance and clean up

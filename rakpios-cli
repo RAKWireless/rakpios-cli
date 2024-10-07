@@ -193,7 +193,7 @@ do_fresh_install() {
     do_check_dependencies
     do_clean_up
     do_print_install_location
-    do_check_directory "${DIR_TMP}" "${DIR_CNF}" "${DIR_BIN}" # "${DIR_LIB}" # DIR_LIB is created below
+    do_check_directory "${DIR_TMP}" "${DIR_CNF}" "${DIR_BIN}" "${DIR_LIB}"
 
     # clone the rakpios-cli repo and move the files
     if [[ $UPGRADE -eq 1 ]]; then
