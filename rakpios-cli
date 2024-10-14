@@ -14,7 +14,7 @@ CONFIG_FILE=0
 
 DIR_TMP="${HOME}/.cache/rakpios-cli"
 DIR_BIN="${HOME}/.local/bin"
-DIR_LIB="${HOME}/.local/lib/rakpios-cli"
+DIR_LIB="${HOME}/.local/lib"
 DIR_CNF="${HOME}/.config/rakpios-cli"
 
 org="RAKWireless"
@@ -103,11 +103,11 @@ main() {
     # start the rakpios-cli if no options is passed to the script
     if [[ $OPTIND -eq 1 ]]; then
         # shellcheck source=/dev/null
-        source "${DIR_LIB}/rakpios-cli-network-manage"
+        source "${DIR_LIB}/rakpios-cli/rakpios-cli-network-manage"
         # shellcheck source=/dev/null
-        source "${DIR_LIB}/rakpios-cli-service-deploy"
+        source "${DIR_LIB}/rakpios-cli/rakpios-cli-service-deploy"
         # shellcheck source=/dev/null
-        source "${DIR_LIB}/rakpios-cli-service-list"
+        source "${DIR_LIB}/rakpios-cli/rakpios-cli-service-list"
         do_check_for_update
         do_rakpios_cli_menu
     fi
@@ -204,7 +204,7 @@ do_fresh_install() {
 
     if git clone --quiet https://github.com/${org}/${repo}.git "${DIR_TMP}/"; then
         __msg_debug "Download completed"
-        cp -r "${DIR_TMP}/lib" "${DIR_LIB}" # overwrites folder (that's why we are not creating it before)
+        cp -rf "${DIR_TMP}/lib" "${DIR_LIB}/rakpios-cli"
         cp "${DIR_TMP}/rakpios-cli" "${DIR_BIN}/rakpios-cli"
         git -C "${DIR_TMP}" tag -l --sort=v:refname | tail -1 > "${DIR_CNF}/rakpios-cli.version"
         __msg_debug "Tool copy completed"
