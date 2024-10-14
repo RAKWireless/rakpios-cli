@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 (2024-10-14)
+
+* Fix installation issue in libraries
+
 ## 0.1.3 (2024-10-07)
 
 * Fix installation issue when $HOME/.local/lib not existing
