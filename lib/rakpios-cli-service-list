@@ -15,8 +15,9 @@ do_command() {
 	else
 		STATUS=$( docker compose ls -a | grep "$CONTAINER_NAME" | grep -q "running" && echo "Up" || echo "Exited" )
 	fi
+
 	CMD=$(
-		whiptail --notags --title "$CONTAINER_NAME" --menu "" 15 60 4 \
+		whiptail --notags --title "$CONTAINER_NAME ($STATUS)" --menu "" 15 60 4 \
 			"start" "Start the service" \
 			"stop" "Stop the service" \
 			"remove" "Remove the service" \
@@ -89,6 +90,7 @@ do_command() {
 
 			;;
 		esac
+		do_command
 	fi
 }
 
