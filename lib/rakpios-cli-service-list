@@ -29,8 +29,11 @@ do_command() {
 
 	if [ -z "$CMD" ]; then		
 		do_service_menu
-	else
-		case "$CMD" in
+		return
+	fi
+
+	case "$CMD" in
+
 		"start")
 			if [ "$STATUS" == "Up" ]; then
 				whiptail --title "Notes" --msgbox "$CONTAINER_NAME is already started." 10 60
@@ -49,6 +52,7 @@ do_command() {
 				fi
 			fi
 			;;
+		
 		"stop")
 			if [ "$STATUS" == "Exited" ]; then
 				whiptail --title "Notes" --msgbox "$CONTAINER_NAME is already stopped." 10 60
@@ -67,6 +71,7 @@ do_command() {
 				fi
 			fi
 			;;
+		
 		"remove")
 			if [ "$service_type" == "1" ]; then
 				docker stop "$CONTAINER_NAME" > /dev/null
@@ -74,7 +79,10 @@ do_command() {
 			else
 				docker compose -p "$CONTAINER_NAME" down
 			fi
+			do_service_menu
+			return
 			;;
+		
 		"log")
 			if [[ " ${docker_run_services[*]} " =~ " ${CONTAINER_NAME} " ]]; then
 				# start a new session to display docker run service's log
@@ -89,9 +97,10 @@ do_command() {
 			fi
 
 			;;
-		esac
-		do_command
-	fi
+	esac
+
+	do_command
+
 }
 
 do_service_menu() {
