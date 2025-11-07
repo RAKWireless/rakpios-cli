@@ -324,10 +324,13 @@ do_docker_run() {
 do_docker_compose_up() {
     
     # Get yaml path
-    yml_file_path=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' "${DIR_CNF}/portainer_app_template.json" | tr -d '"')
+    yml_file_path=${DIR_CNF}/$( jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' "${DIR_CNF}/portainer_app_template.json" | tr -d '"' )
+
+    # Get folder path
+    yml_folder=$( dirname -- $yml_file_path )
 
     # Build command
-    docker_compose_command="${env_full_list//-e /} docker compose -f ${DIR_CNF}/${yml_file_path} up -d"
+    docker_compose_command="cd $yml_folder ; ${env_full_list//-e /} docker compose -f ${yml_file_path} up -d"
     
     # Evaluate
     __msg_debug "$docker_compose_command"
