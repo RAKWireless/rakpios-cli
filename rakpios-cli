@@ -51,10 +51,9 @@ main() {
     
     SHORT=i,u,d,h,v,s
     LONG=install,upgrade,debug,help,version,silent
-    OPTS=$(getopt --options $SHORT --longoptions $LONG -- "$@")
-    if [ $? -ne 0 ]; then
+    if ! OPTS=$(getopt --options "$SHORT" --longoptions "$LONG" -- "$@"); then
         usage
-        exit 0
+        exit 1
     fi
     
     eval set -- "$OPTS"
@@ -270,9 +269,13 @@ do_check_docker_basic(){
 
 do_rakpios_cli_menu(){
 
-    main_menu_option=$(whiptail --notags --title "RAKPiOS Configuration Tool (rakpios-cli)" --menu "" 20 78 8 "network" "Manage networks" "container" "Deploy services" "list" "List services" --cancel-button Finish --ok-button Select 3>&1 1>&2 2>&3)
-    exitstatus=$?
-    if [ $exitstatus = 0 ]; then
+    while true; do
+
+        if ! main_menu_option=$(whiptail --notags --title "RAKPiOS Configuration Tool (rakpios-cli)" --menu "" 20 78 8 "network" "Manage networks" "container" "Deploy services" "list" "List services" --cancel-button Finish --ok-button Select 3>&1 1>&2 2>&3); then
+            __msg_debug "User selected Cancel."
+            exit 0
+        fi
+
         case $main_menu_option in
             network)
               do_network_main_menu
@@ -285,14 +288,11 @@ do_rakpios_cli_menu(){
               do_service_menu
               ;;
             *)
-              echo -n "unknown"
+              __msg_debug "Unknown menu option: $main_menu_option"
               ;;
         esac
-    do_rakpios_cli_menu
-    else
-        __msg_debug "User selected Cancel."
-        exit 0
-    fi
+
+    done
 
 }
 

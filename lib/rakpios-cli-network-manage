@@ -116,8 +116,7 @@ do_wifi_ap()
 
 	# Set a password. An empty passphrase is allowed and means an open network,
 	# which is what the prompt offers; only Cancel aborts.
-	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
-	if [ $? -ne 0 ]; then
+	if ! PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3); then
 		clear
 		return 0
 	fi
@@ -204,8 +203,7 @@ do_wifi_sta()
 
 	# Ask the user the passphrase for the SSID. An empty passphrase is allowed
 	# and means an open network, as the prompt offers; only Cancel aborts.
-	PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3)
-	if [ $? -ne 0 ]; then
+	if ! PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3); then
 		clear
 		return 0
 	fi

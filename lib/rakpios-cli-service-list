@@ -2,19 +2,14 @@
 
 do_command() {
 
-	# $1 (optional): explicit service type, 1 = docker run, 0 = docker compose.
-	# The deploy flow knows the type from the template and passes it in.
-	# do_service_menu omits it and derives the type from docker_run_services,
-	# which only do_service_menu populates.
-	if [ -n "${1:-}" ]; then
-		service_type=$1
-	elif [[ " ${docker_run_services[*]} " == *" ${CONTAINER_NAME} "* ]]; then
-		# docker run service
-		service_type=1
-	else
-		# docker compose service
-		service_type=0
-	fi
+	# $1: service type, 1 = docker run, 0 = docker compose. Always passed by the
+	# caller: the deploy flow reads it from the template, do_service_menu derives
+	# it from docker_run_services. Guessing it here is what used to break the
+	# deploy flow, where docker_run_services is never populated.
+	service_type=$1
+
+	# keep showing the action menu until the user backs out or removes the service
+	while true; do
 
 	# Match the name field exactly; an unanchored grep also matches
 	# containers whose name merely contains "$CONTAINER_NAME".
@@ -39,8 +34,8 @@ do_command() {
 
 	__msg_debug "Executing action $CMD on $CONTAINER_NAME"
 
-	if [ -z "$CMD" ]; then		
-		do_service_menu
+	# back to the caller, which redisplays whichever menu we came from
+	if [ -z "$CMD" ]; then
 		return
 	fi
 
@@ -52,10 +47,12 @@ do_command() {
 			else
 				if [ "$service_type" == "1" ]; then
 					docker start "$CONTAINER_NAME" > /dev/null
+					result=$?
 				else
 					docker compose -p "$CONTAINER_NAME" start
+					result=$?
 				fi
-				if [ $? -eq 0 ]; then
+				if [ $result -eq 0 ]; then
 					__msg_debug "Docker compose up ran successfully"
 					whiptail --title "Notes" --msgbox "$CONTAINER_NAME is started now." 10 60
 				else
@@ -71,10 +68,12 @@ do_command() {
 			else
 				if [ "$service_type" == "1" ]; then
 					docker stop "$CONTAINER_NAME" > /dev/null
+					result=$?
 				else
 					docker compose -p "$CONTAINER_NAME" stop
+					result=$?
 				fi
-				if [ $? -eq 0 ]; then
+				if [ $result -eq 0 ]; then
 					# __msg_debug "docker compose stop ran successfully"
 					whiptail --title "Notes" --msgbox "$CONTAINER_NAME is stopped now." 10 60
 				else
@@ -91,7 +90,7 @@ do_command() {
 			else
 				docker compose -p "$CONTAINER_NAME" down
 			fi
-			do_service_menu
+			# the service is gone, so the list has to be rebuilt by the caller
 			return
 			;;
 		
@@ -111,12 +110,15 @@ do_command() {
 			;;
 	esac
 
-	do_command "$service_type"
+	done
 
 }
 
 do_service_menu() {
-	
+
+	# rebuild the list each time round: services may have been removed
+	while true; do
+
 	# Get lonely containers :)
 	SERVICES=$(docker ps -a --format '{{.Names}}' | sort -k1)
 	docker_run_services=()
@@ -128,14 +130,15 @@ do_service_menu() {
 	done
 
 	# Get docker compose services
-	service_list=($(docker compose ls -a | awk '{print $1}' | tail -n +2))
+	mapfile -t service_list < <(docker compose ls -a | awk '{print $1}' | tail -n +2)
 	
 	# Append the two array
 	service_list=("${service_list[@]}" "${docker_run_services[@]}")
 
 	if [ ${#service_list[@]} -eq 0 ]; then
-		
+
 		whiptail --msgbox "There are no running services" 10 60
+		return
 
 	else
 
@@ -151,12 +154,18 @@ do_service_menu() {
 
 		# List
 		CONTAINER_NAME=$(whiptail --notags --title "Service List" --menu "" 20 60 10 "${duplicated[@]}" 3>&1 1>&2 2>&3)
-		
+
 		# Execute
-		if [ -n "$CONTAINER_NAME" ]; then
-			do_command
+		if [ -z "$CONTAINER_NAME" ]; then
+			return
+		fi
+		if [[ " ${docker_run_services[*]} " == *" ${CONTAINER_NAME} "* ]]; then
+			do_command 1
+		else
+			do_command 0
 		fi
 
-
 	fi
+
+	done
 }
