@@ -56,10 +56,14 @@ do_get_service_env_defaults() {
         unset "service_env[$k]"
     done
 
-    service_env_string=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env[] | .name+"|"+.default' "${DIR_CNF}/portainer_app_template.json" | tr -d '"')
-    
+    # .env[]? rather than .env[] so services without variables yield no output
+    # instead of a jq error printed over the whiptail screen
+    service_env_string=$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .env[]? | .name+"|"+.default' "${DIR_CNF}/portainer_app_template.json" | tr -d '"')
+
     while read -r pair
     do
+        # an empty jq result still feeds one blank line into the loop
+        [ -z "$pair" ] && continue
         local label=${pair%%|*}
         local default=${pair#*|}
         service_env["$label"]="$default"
@@ -76,9 +80,15 @@ do_get_service_env_defaults() {
 do_choose_service_env() {
 
     service_env_array=()
-    
-    IFS=$'\n' keys=($(sort -n <<<"${!service_env[@]}"))
-    unset IFS
+
+    if [ ${#service_env[@]} -eq 0 ]; then
+        whiptail --title "Variables" --msgbox "This service has no configurable variables." 10 60
+        do_pre_up_options
+        return
+    fi
+
+    # one key per line, otherwise sort receives a single line and does nothing
+    mapfile -t keys < <(printf '%s\n' "${!service_env[@]}" | sort)
     for k in "${keys[@]}"
     do
         value=${service_env[$k]}
@@ -151,7 +161,7 @@ do_change_service_env(){
 # Modifies the required environment variable with a new value
 do_get_modified_env_list() {
     
-    service_env[$env_label_to_configure]="${value_changed_to_text}"
+    service_env["$env_label_to_configure"]="${value_changed_to_text}"
     __msg_debug "New value for $env_label_to_configure: ${value_changed_to_text}"
     do_choose_service_env
     return
@@ -179,7 +189,7 @@ do_pre_up_options() {
 
 # Ask user for confirmation before deploying the service
 do_ask_for_confirmation() {
-    if (whiptail --title "Confirmation" --yesno "Do you wan to deploy ${service_to_start}?" 8 78); then
+    if (whiptail --title "Confirmation" --yesno "Do you want to deploy ${service_to_start}?" 8 78); then
         __msg_debug "User selected to deploy ${service_to_start}."
         do_check_service_type
     else
@@ -205,7 +215,9 @@ do_check_service_type() {
     service_type="$(do_get_property "$service_to_start" type)"
     if [ "$service_type" == "1" ]; then
         tmp_name=$(echo "$container_name" | awk '{print $2}')
-        CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep "${tmp_name}")
+        # -Fx: exact whole-line match. An unanchored grep makes "portainer"
+        # match "portainer-agent", and container names may contain regex characters.
+        CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep -Fx "${tmp_name}")
         if [ -z "$CONTAINER_NAME" ]; then
             do_docker_run
         else
@@ -219,7 +231,7 @@ do_check_service_type() {
         
         exist=0
         for tmp_name in $tmp_name_list; do
-            CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep "^${tmp_name}\$")
+            CONTAINER_NAME=$(docker ps -a --format '{{.Names}}' | grep -Fx "${tmp_name}")
             if [ -z "$CONTAINER_NAME" ]; then
                 continue
             else
@@ -351,7 +363,7 @@ do_docker_compose_up() {
 
 do_get_host_ip() {
 
-    if [[ -n "${RAKPIOS_HOST}" ]]; then
+    if [[ -n "${RAKPIOS_HOST:-}" ]]; then
         HOST_IP=${RAKPIOS_HOST}
     else
         SHOW_IP_PATTERN="^bond.*|^[ewr].*|^br.*|^lt.*|^umts.*|^lan.*"

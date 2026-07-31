@@ -241,7 +241,7 @@ do_fresh_install() {
     __msg_debug "Remove cached files ${DIR_TMP} after installation"  
     rm -rf "${DIR_TMP}"
 
-    # Print version information after installation fininshed
+    # Print version information after installation finished
     if do_get_version_information; then 
         echo "rakpios-cli version ${local_version_rakpios_cli}"
         echo "service version ${local_version_portainer_json}"
@@ -252,12 +252,17 @@ do_fresh_install() {
 do_check_docker_basic(){
     
     if [ -x "$(command -v docker)" ]; then
-        if docker info --format '{{json .}}' | grep "permission denied"; then
-        whiptail --msgbox "Got permission denied while trying to connect to the Docker daemon socket. Please make sure the current user has the right premission." 10 60
-        exit 1
-        fi  
+        # docker reports connection problems on stderr, so capture that and not stdout
+        if ! docker_error=$(docker info 2>&1 >/dev/null); then
+            if printf '%s' "$docker_error" | grep -qi "permission denied"; then
+                whiptail --msgbox "Got permission denied while trying to connect to the Docker daemon socket. Please make sure the current user has the right permission." 10 60
+            else
+                whiptail --msgbox "Cannot connect to the Docker daemon. Please make sure docker is running." 10 60
+            fi
+            exit 1
+        fi
     else
-        whiptail --msgbox "Docker not install, please install docker first" 20 60
+        whiptail --msgbox "Docker is not installed, please install docker first" 20 60
         exit 1
     fi
 
@@ -335,31 +340,37 @@ do_get_version_information() {
         local_version_rakpios_cli=$(cat "${DIR_CNF}/rakpios-cli.version")
 
     else
-        __msg_debug "Can not found rakpios-cli or stack configuration files."
+        __msg_debug "Could not find rakpios-cli or stack configuration files."
         CONFIG_FILE=1
     fi
 
 }
 
+# Returns 0 if $1 is strictly newer than $2, comparing them as versions.
+# A plain string comparison gets this wrong: "v1.10.0" sorts before "v1.9.0".
+version_gt() {
+    [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]
+}
+
 # check for updates
-do_check_for_update(){ 
+do_check_for_update(){
 
     do_get_version_information
-    
-    if [ $CONFIG_FILE == 1 ] ; then
+
+    if [ $CONFIG_FILE -eq 1 ] ; then
         whiptail --title "Error" --msgbox  "Unable to find rakpios-cli or stack configuration files. Try reinstall the tool to fix it." 10 78
         return 
     fi
 
     # Check versions format
-    VERSION_PATTERN="^v[0-99].[0-99]"
+    VERSION_PATTERN="^v[0-9]+\.[0-9]+"
     if [[ ! $remote_version_portainer_json =~ $VERSION_PATTERN ]] || [[ ! $local_version_portainer_json =~ $VERSION_PATTERN ]] || [[ ! $remote_version_rakpios_cli =~ $VERSION_PATTERN ]] || [[ ! $local_version_rakpios_cli =~ $VERSION_PATTERN ]]; then
         whiptail --title "Error" --msgbox  "Updates check failed, please check your network connection, and try again later." 10 78
         return
     fi
     
     # Check updates for rakpios-cli and portainer template version
-    if [[ $remote_version_portainer_json > $local_version_portainer_json ]] || [[ $remote_version_rakpios_cli > $local_version_rakpios_cli ]]; then
+    if version_gt "$remote_version_portainer_json" "$local_version_portainer_json" || version_gt "$remote_version_rakpios_cli" "$local_version_rakpios_cli"; then
         whiptail --title "New Update is available" --msgbox "An update for rakpios-cli is available.\nRun 'rakpios-cli --upgrade' to upgrade." 8 78
         __msg_debug "An update is available."       
     fi

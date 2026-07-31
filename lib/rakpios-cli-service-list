@@ -10,10 +10,16 @@ do_command() {
 		service_type=0
 	fi
 
+	# Match the name field exactly; an unanchored grep also matches
+	# containers whose name merely contains "$CONTAINER_NAME".
 	if [ "$service_type" == "1" ]; then
-		STATUS=$( docker ps -a --format '{{.Names}}\t{{.Status}}' | grep "$CONTAINER_NAME" | awk '{ print $2 }' )
+		STATUS=$( docker ps -a --format '{{.Names}}\t{{.Status}}' | awk -F'\t' -v n="$CONTAINER_NAME" '$1==n { split($2, s, " "); print s[1] }' )
 	else
-		STATUS=$( docker compose ls -a | grep "$CONTAINER_NAME" | grep -q "running" && echo "Up" || echo "Exited" )
+		if docker compose ls -a | awk -v n="$CONTAINER_NAME" '$1==n { print $2 }' | grep -q "running"; then
+			STATUS="Up"
+		else
+			STATUS="Exited"
+		fi
 	fi
 
 	CMD=$(
@@ -86,12 +92,12 @@ do_command() {
 		"log")
 			if [[ " ${docker_run_services[*]} " =~ " ${CONTAINER_NAME} " ]]; then
 				# start a new session to display docker run service's log
-				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker logs -f --timestamps --since 10 $CONTAINER_NAME"
+				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker logs -f --timestamps --since 10m $CONTAINER_NAME"
 				# Attach to the new session
 				tmux attach-session -t service-logs
 			else
 				# start a new session to display docker compose service's log
-				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker compose -p $CONTAINER_NAME logs --follow --since 10"
+				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker compose -p $CONTAINER_NAME logs --follow --since 10m"
 				# Attach to the new session
 				tmux attach-session -t service-logs
 			fi
@@ -119,7 +125,7 @@ do_service_menu() {
 	service_list=($(docker compose ls -a | awk '{print $1}' | tail -n +2))
 	
 	# Append the two array
-	service_list=(${service_list[@]} ${docker_run_services[@]})
+	service_list=("${service_list[@]}" "${docker_run_services[@]}")
 
 	if [ ${#service_list[@]} -eq 0 ]; then
 		
@@ -128,11 +134,10 @@ do_service_menu() {
 	else
 
 		# Sort the array
-		IFS=$'\n' sorted=($(sort <<< "${service_list[*]}"))
-		unset IFS
+		mapfile -t sorted < <(printf '%s\n' "${service_list[@]}" | sort)
 		# __msg_debug "List of running services: [$service_list]"
 
-		# Dupplicate it for whiptail
+		# Duplicate it for whiptail
 		duplicated=()
 		for service in "${sorted[@]}"; do
 			duplicated+=("$service" "$service")
