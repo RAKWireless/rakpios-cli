@@ -222,7 +222,7 @@ do_check_service_type() {
             do_docker_run
         else
             whiptail --title "Notes" --msgbox  "$CONTAINER_NAME already exists." 10 60
-            do_command
+            do_command 1
         fi
     else
 
@@ -237,7 +237,12 @@ do_check_service_type() {
             else
                 exist=1
                 whiptail --title "Notes" --msgbox  "Service '$CONTAINER_NAME' already exists." 10 60
-                do_command
+                # do_command drives compose by *project* name, but what we matched
+                # above is a container name. Read the project off the container's
+                # own label rather than guessing how compose derived it.
+                project_name=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$CONTAINER_NAME" 2>/dev/null)
+                [ -n "$project_name" ] && CONTAINER_NAME="$project_name"
+                do_command 0
                 break;
             fi
         done
@@ -322,14 +327,12 @@ do_docker_run() {
     eval "$docker_run_command"
     response=$?
 
-    if [ $response -ne 0 ]; 
+    if [ $response -ne 0 ];
     then
         whiptail --msgbox "Error bringing up the service" 10 60
     else
         do_print_post_up_info
     fi
-
-    echo $response
 
 }
 
@@ -339,25 +342,25 @@ do_docker_compose_up() {
     yml_file_path=${DIR_CNF}/$( jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' "${DIR_CNF}/portainer_app_template.json" | tr -d '"' )
 
     # Get folder path
-    yml_folder=$( dirname -- $yml_file_path )
+    yml_folder=$( dirname -- "$yml_file_path" )
 
-    # Build command
-    docker_compose_command="cd $yml_folder ; ${env_full_list//-e /} docker compose -f ${yml_file_path} up -d"
-    
+    # Build command. The env variables are a "KEY=value ..." prefix, so this
+    # still needs eval, but the cd runs in a subshell: done inline it would
+    # leave the whole tool sitting in the stack folder for the rest of the session.
+    docker_compose_command="${env_full_list//-e /} docker compose -f \"${yml_file_path}\" up -d"
+
     # Evaluate
-    __msg_debug "$docker_compose_command"
-    eval "$docker_compose_command"
+    __msg_debug "cd ${yml_folder} && ${docker_compose_command}"
+    ( cd "$yml_folder" && eval "$docker_compose_command" )
     response=$?
 
     # Check output
-    if [ $response -ne 0 ]; 
+    if [ $response -ne 0 ];
     then
         whiptail --msgbox "Error bringing up the service" 10 60
     else
         do_print_post_up_info
     fi
-
-    echo $response
 
 }
 

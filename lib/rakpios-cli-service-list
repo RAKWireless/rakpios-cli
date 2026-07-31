@@ -2,7 +2,13 @@
 
 do_command() {
 
-	if [[ " ${docker_run_services[*]} " =~ " ${CONTAINER_NAME} " ]]; then
+	# $1 (optional): explicit service type, 1 = docker run, 0 = docker compose.
+	# The deploy flow knows the type from the template and passes it in.
+	# do_service_menu omits it and derives the type from docker_run_services,
+	# which only do_service_menu populates.
+	if [ -n "${1:-}" ]; then
+		service_type=$1
+	elif [[ " ${docker_run_services[*]} " == *" ${CONTAINER_NAME} "* ]]; then
 		# docker run service
 		service_type=1
 	else
@@ -90,7 +96,7 @@ do_command() {
 			;;
 		
 		"log")
-			if [[ " ${docker_run_services[*]} " =~ " ${CONTAINER_NAME} " ]]; then
+			if [ "$service_type" == "1" ]; then
 				# start a new session to display docker run service's log
 				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker logs -f --timestamps --since 10m $CONTAINER_NAME"
 				# Attach to the new session
@@ -105,7 +111,7 @@ do_command() {
 			;;
 	esac
 
-	do_command
+	do_command "$service_type"
 
 }
 
