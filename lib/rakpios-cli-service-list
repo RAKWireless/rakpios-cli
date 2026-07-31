@@ -86,12 +86,12 @@ do_command() {
 		"log")
 			if [[ " ${docker_run_services[*]} " =~ " ${CONTAINER_NAME} " ]]; then
 				# start a new session to display docker run service's log
-				tmux new-session -d -s service-logs "docker logs -f --timestamps --since 10 $CONTAINER_NAME"
+				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker logs -f --timestamps --since 10 $CONTAINER_NAME"
 				# Attach to the new session
 				tmux attach-session -t service-logs
 			else
 				# start a new session to display docker compose service's log
-				tmux new-session -d -s service-logs "docker compose -p $CONTAINER_NAME logs --follow --since 10"
+				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker compose -p $CONTAINER_NAME logs --follow --since 10"
 				# Attach to the new session
 				tmux attach-session -t service-logs
 			fi

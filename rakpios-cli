@@ -17,6 +17,11 @@ DIR_BIN="${HOME}/.local/bin"
 DIR_LIB="${HOME}/.local/lib"
 DIR_CNF="${HOME}/.config/rakpios-cli"
 
+# Only these paths belong to the tool and may be removed on install/upgrade.
+# DIR_LIB itself is shared with other software (pip --user, etc.) and must not be touched.
+DIR_LIB_TOOL="${DIR_LIB}/rakpios-cli"
+TMUX_CONF="${DIR_CNF}/tmux.conf"
+
 org="RAKWireless"
 repo="rakpios-cli"
 
@@ -92,9 +97,6 @@ main() {
     # Check dependencies
     do_check_dependencies
 
-    # Configure tmux
-    echo -e "set-option -g mouse on\nbind-key -n C-C confirm-before kill-session" >~/.tmux.conf
-
     if [ "$INSTALL" == "1" ] || [ "$UPGRADE" == "1" ]; then
         do_install
         exit 0
@@ -102,12 +104,22 @@ main() {
 
     # start the rakpios-cli if no options is passed to the script
     if [[ $OPTIND -eq 1 ]]; then
+        # Configure tmux for the log viewer.
+        # This is written to a tool-owned file and passed to tmux with -f, so the
+        # user's own ~/.tmux.conf is never read, modified or overwritten.
+        # Written here rather than before do_install, which clears DIR_CNF.
+        mkdir -p "${DIR_CNF}"
+        printf '%s\n' \
+            "set-option -g mouse on" \
+            "bind-key -n C-C confirm-before kill-session" \
+            > "${TMUX_CONF}"
+
         # shellcheck source=/dev/null
-        source "${DIR_LIB}/rakpios-cli/rakpios-cli-network-manage"
+        source "${DIR_LIB_TOOL}/rakpios-cli-network-manage"
         # shellcheck source=/dev/null
-        source "${DIR_LIB}/rakpios-cli/rakpios-cli-service-deploy"
+        source "${DIR_LIB_TOOL}/rakpios-cli-service-deploy"
         # shellcheck source=/dev/null
-        source "${DIR_LIB}/rakpios-cli/rakpios-cli-service-list"
+        source "${DIR_LIB_TOOL}/rakpios-cli-service-list"
         do_check_for_update
         do_rakpios_cli_menu
     fi
@@ -155,7 +167,7 @@ do_install() {
 }
 
 do_print_install_location(){
-    __msg_debug "The rakpios-cli will be installed in the ${DIR_BIN}, ${DIR_LIB} and ${DIR_CNF} folders"
+    __msg_debug "The rakpios-cli will be installed in the ${DIR_BIN}, ${DIR_LIB_TOOL} and ${DIR_CNF} folders"
 }
 
 do_print_version(){
@@ -171,7 +183,7 @@ do_print_version(){
 }
 
 do_clean_up(){
-    rm -rf "${DIR_TMP}" "${DIR_BIN}/rakpios-cli" "${DIR_LIB}" "${DIR_CNF}"
+    rm -rf "${DIR_TMP}" "${DIR_BIN}/rakpios-cli" "${DIR_LIB_TOOL}" "${DIR_CNF}"
 }
 
 # Check install directory
@@ -193,7 +205,7 @@ do_fresh_install() {
     do_check_dependencies
     do_clean_up
     do_print_install_location
-    do_check_directory "${DIR_TMP}" "${DIR_CNF}" "${DIR_BIN}" "${DIR_LIB}"
+    do_check_directory "${DIR_TMP}" "${DIR_CNF}" "${DIR_BIN}" "${DIR_LIB_TOOL}"
 
     # clone the rakpios-cli repo and move the files
     if [[ $UPGRADE -eq 1 ]]; then
@@ -204,7 +216,7 @@ do_fresh_install() {
 
     if git clone --quiet https://github.com/${org}/${repo}.git "${DIR_TMP}/"; then
         __msg_debug "Download completed"
-        cp -rf "${DIR_TMP}/lib" "${DIR_LIB}/rakpios-cli"
+        cp -rf "${DIR_TMP}/lib/." "${DIR_LIB_TOOL}/"
         cp "${DIR_TMP}/rakpios-cli" "${DIR_BIN}/rakpios-cli"
         git -C "${DIR_TMP}" tag -l --sort=v:refname | tail -1 > "${DIR_CNF}/rakpios-cli.version"
         __msg_debug "Tool copy completed"
