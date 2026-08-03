@@ -2,170 +2,175 @@
 
 do_command() {
 
-	# $1: service type, 1 = docker run, 0 = docker compose. Always passed by the
-	# caller: the deploy flow reads it from the template, do_service_menu derives
-	# it from docker_run_services. Guessing it here is what used to break the
-	# deploy flow, where docker_run_services is never populated.
-	service_type=$1
+    # $1: service type, 1 = docker run, 0 = docker compose. Always passed by the
+    # caller: the deploy flow reads it from the template, do_service_menu derives
+    # it from docker_run_services. Guessing it here is what used to break the
+    # deploy flow, where docker_run_services is never populated.
+    service_type=$1
 
-	# keep showing the action menu until the user backs out or removes the service
-	while true; do
+    # keep showing the action menu until the user backs out or removes the service
+    while true; do
 
-	# Match the name field exactly; an unanchored grep also matches
-	# containers whose name merely contains "$CONTAINER_NAME".
-	if [ "$service_type" == "1" ]; then
-		STATUS=$( docker ps -a --format '{{.Names}}\t{{.Status}}' | awk -F'\t' -v n="$CONTAINER_NAME" '$1==n { split($2, s, " "); print s[1] }' )
-	else
-		if docker compose ls -a | awk -v n="$CONTAINER_NAME" '$1==n { print $2 }' | grep -q "running"; then
-			STATUS="Up"
-		else
-			STATUS="Exited"
-		fi
-	fi
+    # Match the name field exactly; an unanchored grep also matches
+    # containers whose name merely contains "$CONTAINER_NAME".
+    if [ "$service_type" == "1" ]; then
+        STATUS=$( docker ps -a --format '{{.Names}}\t{{.Status}}' | awk -F'\t' -v n="$CONTAINER_NAME" '$1==n { split($2, s, " "); print s[1] }' )
+    else
+        if docker compose ls -a | awk -v n="$CONTAINER_NAME" '$1==n { print $2 }' | grep -q "running"; then
+            STATUS="Up"
+        else
+            STATUS="Exited"
+        fi
+    fi
 
-	CMD=$(
-		whiptail --notags --title "$CONTAINER_NAME ($STATUS)" --menu "" 15 60 4 \
-			"start" "Start the service" \
-			"stop" "Stop the service" \
-			"remove" "Remove the service" \
-			"log" "Check the logs " \
-			3>&1 1>&2 2>&3
-	)
+    CMD=$(
+        whiptail --notags --title "$CONTAINER_NAME ($STATUS)" --menu "" 15 60 4 \
+            "start" "Start the service" \
+            "stop" "Stop the service" \
+            "remove" "Remove the service" \
+            "log" "Check the logs " \
+            3>&1 1>&2 2>&3
+    )
 
-	__msg_debug "Executing action $CMD on $CONTAINER_NAME"
+    __msg_debug "Executing action $CMD on $CONTAINER_NAME"
 
-	# back to the caller, which redisplays whichever menu we came from
-	if [ -z "$CMD" ]; then
-		return
-	fi
+    # back to the caller, which redisplays whichever menu we came from
+    if [ -z "$CMD" ]; then
+        return
+    fi
 
-	case "$CMD" in
+    case "$CMD" in
 
-		"start")
-			if [ "$STATUS" == "Up" ]; then
-				whiptail --title "Notes" --msgbox "$CONTAINER_NAME is already started." 10 60
-			else
-				if [ "$service_type" == "1" ]; then
-					docker start "$CONTAINER_NAME" > /dev/null
-					result=$?
-				else
-					docker compose -p "$CONTAINER_NAME" start
-					result=$?
-				fi
-				if [ $result -eq 0 ]; then
-					__msg_debug "Docker compose up ran successfully"
-					whiptail --title "Notes" --msgbox "$CONTAINER_NAME is started now." 10 60
-				else
-					__msg_debug "Docker compose up encountered an error"
-					whiptail --title "Notes" --msgbox "$CONTAINER_NAME having trouble to start." 10 60
-				fi
-			fi
-			;;
-		
-		"stop")
-			if [ "$STATUS" == "Exited" ]; then
-				whiptail --title "Notes" --msgbox "$CONTAINER_NAME is already stopped." 10 60
-			else
-				if [ "$service_type" == "1" ]; then
-					docker stop "$CONTAINER_NAME" > /dev/null
-					result=$?
-				else
-					docker compose -p "$CONTAINER_NAME" stop
-					result=$?
-				fi
-				if [ $result -eq 0 ]; then
-					# __msg_debug "docker compose stop ran successfully"
-					whiptail --title "Notes" --msgbox "$CONTAINER_NAME is stopped now." 10 60
-				else
-					# __msg_debug "docker compose stop encountered an error"
-					whiptail --title "Notes" --msgbox "$CONTAINER_NAME having trouble to stop." 10 60
-				fi
-			fi
-			;;
-		
-		"remove")
-			if [ "$service_type" == "1" ]; then
-				docker stop "$CONTAINER_NAME" > /dev/null
-				docker rm "$CONTAINER_NAME" > /dev/null
-			else
-				docker compose -p "$CONTAINER_NAME" down
-			fi
-			# the service is gone, so the list has to be rebuilt by the caller
-			return
-			;;
-		
-		"log")
-			if [ "$service_type" == "1" ]; then
-				# start a new session to display docker run service's log
-				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker logs -f --timestamps --since 10m $CONTAINER_NAME"
-				# Attach to the new session
-				tmux attach-session -t service-logs
-			else
-				# start a new session to display docker compose service's log
-				tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker compose -p $CONTAINER_NAME logs --follow --since 10m"
-				# Attach to the new session
-				tmux attach-session -t service-logs
-			fi
+        "start")
+            if [ "$STATUS" == "Up" ]; then
+                whiptail --title "Notes" --msgbox "$CONTAINER_NAME is already started." 10 60
+            else
+                if [ "$service_type" == "1" ]; then
+                    docker start "$CONTAINER_NAME" > /dev/null
+                    result=$?
+                else
+                    docker compose -p "$CONTAINER_NAME" start
+                    result=$?
+                fi
+                if [ $result -eq 0 ]; then
+                    __msg_debug "Docker compose up ran successfully"
+                    whiptail --title "Notes" --msgbox "$CONTAINER_NAME is started now." 10 60
+                else
+                    __msg_debug "Docker compose up encountered an error"
+                    whiptail --title "Notes" --msgbox "$CONTAINER_NAME having trouble to start." 10 60
+                fi
+            fi
+            ;;
+        
+        "stop")
+            if [ "$STATUS" == "Exited" ]; then
+                whiptail --title "Notes" --msgbox "$CONTAINER_NAME is already stopped." 10 60
+            else
+                if [ "$service_type" == "1" ]; then
+                    docker stop "$CONTAINER_NAME" > /dev/null
+                    result=$?
+                else
+                    docker compose -p "$CONTAINER_NAME" stop
+                    result=$?
+                fi
+                if [ $result -eq 0 ]; then
+                    # __msg_debug "docker compose stop ran successfully"
+                    whiptail --title "Notes" --msgbox "$CONTAINER_NAME is stopped now." 10 60
+                else
+                    # __msg_debug "docker compose stop encountered an error"
+                    whiptail --title "Notes" --msgbox "$CONTAINER_NAME having trouble to stop." 10 60
+                fi
+            fi
+            ;;
+        
+        "remove")
+            if [ "$service_type" == "1" ]; then
+                docker stop "$CONTAINER_NAME" > /dev/null
+                docker rm "$CONTAINER_NAME" > /dev/null
+            else
+                docker compose -p "$CONTAINER_NAME" down
+            fi
+            # the service is gone, so the list has to be rebuilt by the caller
+            return
+            ;;
+        
+        "log")
+            if [ "$service_type" == "1" ]; then
+                # start a new session to display docker run service's log
+                # a leftover session makes new-session fail, and the attach
+                # below would then reattach to the stale one
+                tmux kill-session -t service-logs 2>/dev/null
+                tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker logs -f --timestamps --since 10m $CONTAINER_NAME"
+                # Attach to the new session
+                tmux attach-session -t service-logs
+            else
+                # start a new session to display docker compose service's log
+                # a leftover session makes new-session fail, and the attach
+                # below would then reattach to the stale one
+                tmux kill-session -t service-logs 2>/dev/null
+                tmux -f "${TMUX_CONF}" new-session -d -s service-logs "docker compose -p $CONTAINER_NAME logs --follow --since 10m"
+                # Attach to the new session
+                tmux attach-session -t service-logs
+            fi
 
-			;;
-	esac
+            ;;
+    esac
 
-	done
+    done
 
 }
 
 do_service_menu() {
 
-	# rebuild the list each time round: services may have been removed
-	while true; do
+    # rebuild the list each time round: services may have been removed
+    while true; do
 
-	# Get lonely containers :)
-	SERVICES=$(docker ps -a --format '{{.Names}}' | sort -k1)
-	docker_run_services=()
-	for service in $SERVICES; do
-		output=$(docker inspect "$service" | jq '.[].Config.Labels."com.docker.compose.project.config_files"')
-		if [[ "$output" == "null" ]]; then
-			docker_run_services+=("$service")
-		fi
-	done
+    # Get lonely containers :) - those with no compose project label.
+    # One docker call with the label in the format string, rather than a
+    # docker inspect per container.
+    docker_run_services=()
+    while IFS=$'\t' read -r name project; do
+        [ -z "$name" ] && continue
+        [ -z "$project" ] && docker_run_services+=("$name")
+    done < <(docker ps -a --format '{{.Names}}\t{{.Label "com.docker.compose.project"}}' | sort)
 
-	# Get docker compose services
-	mapfile -t service_list < <(docker compose ls -a | awk '{print $1}' | tail -n +2)
-	
-	# Append the two array
-	service_list=("${service_list[@]}" "${docker_run_services[@]}")
+    # Get docker compose services
+    mapfile -t service_list < <(docker compose ls -a | awk '{print $1}' | tail -n +2)
+    
+    # Append the two array
+    service_list=("${service_list[@]}" "${docker_run_services[@]}")
 
-	if [ ${#service_list[@]} -eq 0 ]; then
+    if [ ${#service_list[@]} -eq 0 ]; then
 
-		whiptail --msgbox "There are no running services" 10 60
-		return
+        whiptail --msgbox "There are no running services" 10 60
+        return
 
-	else
+    else
 
-		# Sort the array
-		mapfile -t sorted < <(printf '%s\n' "${service_list[@]}" | sort)
-		# __msg_debug "List of running services: [$service_list]"
+        # Sort the array
+        mapfile -t sorted < <(printf '%s\n' "${service_list[@]}" | sort)
+        # __msg_debug "List of running services: [$service_list]"
 
-		# Duplicate it for whiptail
-		duplicated=()
-		for service in "${sorted[@]}"; do
-			duplicated+=("$service" "$service")
-		done
+        # Duplicate it for whiptail
+        duplicated=()
+        for service in "${sorted[@]}"; do
+            duplicated+=("$service" "$service")
+        done
 
-		# List
-		CONTAINER_NAME=$(whiptail --notags --title "Service List" --menu "" 20 60 10 "${duplicated[@]}" 3>&1 1>&2 2>&3)
+        # List
+        CONTAINER_NAME=$(whiptail --notags --title "Service List" --menu "" 20 60 10 "${duplicated[@]}" 3>&1 1>&2 2>&3)
 
-		# Execute
-		if [ -z "$CONTAINER_NAME" ]; then
-			return
-		fi
-		if [[ " ${docker_run_services[*]} " == *" ${CONTAINER_NAME} "* ]]; then
-			do_command 1
-		else
-			do_command 0
-		fi
+        # Execute
+        if [ -z "$CONTAINER_NAME" ]; then
+            return
+        fi
+        if [[ " ${docker_run_services[*]} " == *" ${CONTAINER_NAME} "* ]]; then
+            do_command 1
+        else
+            do_command 0
+        fi
 
-	fi
+    fi
 
-	done
+    done
 }

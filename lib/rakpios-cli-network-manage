@@ -9,27 +9,27 @@
 # existing connection is never touched. Ask NetworkManager instead of guessing.
 do_get_connection_for_iface()
 {
-	local IFACE=$1
-	local line
+    local IFACE=$1
+    local line
 
-	# a connection currently active on the device. DEVICE never contains a
-	# colon, so split on the last one: connection names may contain colons.
-	while IFS= read -r line; do
-		if [ "${line##*:}" = "$IFACE" ]; then
-			printf '%s' "${line%:*}"
-			return 0
-		fi
-	done < <(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null)
+    # a connection currently active on the device. DEVICE never contains a
+    # colon, so split on the last one: connection names may contain colons.
+    while IFS= read -r line; do
+        if [ "${line##*:}" = "$IFACE" ]; then
+            printf '%s' "${line%:*}"
+            return 0
+        fi
+    done < <(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null)
 
-	# otherwise a profile bound to the interface but not currently up
-	while IFS= read -r line; do
-		if [ "$(nmcli -t -g connection.interface-name connection show "$line" 2>/dev/null)" = "$IFACE" ]; then
-			printf '%s' "$line"
-			return 0
-		fi
-	done < <(nmcli -t -f NAME connection show 2>/dev/null)
+    # otherwise a profile bound to the interface but not currently up
+    while IFS= read -r line; do
+        if [ "$(nmcli -t -g connection.interface-name connection show "$line" 2>/dev/null)" = "$IFACE" ]; then
+            printf '%s' "$line"
+            return 0
+        fi
+    done < <(nmcli -t -f NAME connection show 2>/dev/null)
 
-	return 1
+    return 1
 }
 
 # Returns 0 if a NetworkManager connection with exactly this name exists.
@@ -37,238 +37,238 @@ do_get_connection_for_iface()
 # chooses itself and which is only readable by root.
 do_connection_exists()
 {
-	nmcli -t -f NAME connection show 2>/dev/null | grep -Fxq "$1"
+    nmcli -t -f NAME connection show 2>/dev/null | grep -Fxq "$1"
 }
 
 do_configure_dhcp()
 {
 
-	local NAME=$1
-	local CON
-	CON=$(do_get_connection_for_iface "$NAME")
+    local NAME=$1
+    local CON
+    CON=$(do_get_connection_for_iface "$NAME")
 
-	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
+    if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-		# Reconfigure the interface's existing connection when there is one.
-		# Creating a second profile for the same interface would compete with it.
-		if [ -n "$CON" ]; then
-			sudo nmcli connection modify "$CON" ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
-			RET=$(sudo nmcli connection up "$CON" 2>&1)
-		else
-			sudo nmcli connection add con-name "$NAME" ifname "$NAME" type ethernet ipv4.method auto
-			RET=$(sudo nmcli connection up "$NAME" 2>&1)
-		fi
-		whiptail --title "Notes" --msgbox  "$RET" 10 60
-	else
-		return 0
-	fi
+        # Reconfigure the interface's existing connection when there is one.
+        # Creating a second profile for the same interface would compete with it.
+        if [ -n "$CON" ]; then
+            sudo nmcli connection modify "$CON" ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
+            RET=$(sudo nmcli connection up "$CON" 2>&1)
+        else
+            sudo nmcli connection add con-name "$NAME" ifname "$NAME" type ethernet ipv4.method auto
+            RET=$(sudo nmcli connection up "$NAME" 2>&1)
+        fi
+        whiptail --title "Notes" --msgbox  "$RET" 10 60
+    else
+        return 0
+    fi
 }
 
 do_configure_static()
 {
 
-	local NAME=$1
-	local CON
-	CON=$(do_get_connection_for_iface "$NAME")
+    local NAME=$1
+    local CON
+    CON=$(do_get_connection_for_iface "$NAME")
 
-	IP=$(whiptail --inputbox "input IP address/prefix" 10 60 "192.168.240.100/24" --title "IP address" 3>&1 1>&2 2>&3)
-	if [ -z "$IP" ]; then
-		clear
-		return 0
-	fi
-	GW=$(whiptail --inputbox "input Gateway address" 10 60 "192.168.240.1" --title "gateway address" 3>&1 1>&2 2>&3)
+    IP=$(whiptail --inputbox "input IP address/prefix" 10 60 "192.168.240.100/24" --title "IP address" 3>&1 1>&2 2>&3)
+    if [ -z "$IP" ]; then
+        clear
+        return 0
+    fi
+    GW=$(whiptail --inputbox "input Gateway address" 10 60 "192.168.240.1" --title "gateway address" 3>&1 1>&2 2>&3)
     if [ -z "$GW" ]; then
-		clear
-		return 0
-	fi
-	DNS=$(whiptail --inputbox "input dns server address" 10 60 "8.8.8.8" --title "gateway address" 3>&1 1>&2 2>&3)
-	if [ -z "$DNS" ]; then
-		clear
-		return 0
-	fi
-	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then    					
-		# As above: reconfigure the interface's existing connection if it has one
-		if [ -n "$CON" ]; then
-			sudo nmcli connection modify "$CON" ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
-			RET=$(sudo nmcli connection up "$CON" 2>&1)
-		else
-			sudo nmcli connection add con-name "$NAME" ifname "$NAME" type ethernet ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
-			RET=$(sudo nmcli connection up "$NAME" 2>&1)
-		fi
-		whiptail --title "Notes" --msgbox  "$RET" 10 60
-	else
-    	return 0
-	fi
+        clear
+        return 0
+    fi
+    DNS=$(whiptail --inputbox "input dns server address" 10 60 "8.8.8.8" --title "gateway address" 3>&1 1>&2 2>&3)
+    if [ -z "$DNS" ]; then
+        clear
+        return 0
+    fi
+    if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then    					
+        # As above: reconfigure the interface's existing connection if it has one
+        if [ -n "$CON" ]; then
+            sudo nmcli connection modify "$CON" ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
+            RET=$(sudo nmcli connection up "$CON" 2>&1)
+        else
+            sudo nmcli connection add con-name "$NAME" ifname "$NAME" type ethernet ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
+            RET=$(sudo nmcli connection up "$NAME" 2>&1)
+        fi
+        whiptail --title "Notes" --msgbox  "$RET" 10 60
+    else
+        return 0
+    fi
 }
 
 do_configure_ethernet()
 {
-	IFACES=$( tail -n+3 < /proc/net/dev | cut -d ":" -f1 | sed 's/ //g' | grep -E '^eth|^en' )
-	iface_list=()
+    IFACES=$( tail -n+3 < /proc/net/dev | cut -d ":" -f1 | sed 's/ //g' | grep -E '^eth|^en' )
+    iface_list=()
     while read -r line; do
         # an empty result still feeds one blank line into the loop
         [ -z "$line" ] && continue
         iface_list+=("$line" "$line")
     done <<< "$IFACES"
 
-	if [ ${#iface_list[@]} -eq 0 ]; then
-		whiptail --title "Notes" --msgbox "No Ethernet interfaces found." 10 60
-		return 0
-	fi
+    if [ ${#iface_list[@]} -eq 0 ]; then
+        whiptail --title "Notes" --msgbox "No Ethernet interfaces found." 10 60
+        return 0
+    fi
 
-	IFACE=$( whiptail --notags --title " CONFIGURE ETHERNET" --menu "Select Interface:" 15 60 4 "${iface_list[@]}" 3>&1 1>&2 2>&3 )
+    IFACE=$( whiptail --notags --title " CONFIGURE ETHERNET" --menu "Select Interface:" 15 60 4 "${iface_list[@]}" 3>&1 1>&2 2>&3 )
     RET=$?
-	
-	if [ $RET -eq 1 ]; then
+    
+    if [ $RET -eq 1 ]; then
                 clear
                 return 0
     elif [ $RET -eq 0 ]; then
-		ADDR=$(whiptail --title "CONFIGURE ETHERNET" --menu "Select IP Address Type:" 15 60 4 \
+        ADDR=$(whiptail --title "CONFIGURE ETHERNET" --menu "Select IP Address Type:" 15 60 4 \
                 "1" "DHCP" \
                 "2" "Static" \
                 3>&1 1>&2 2>&3)
-		RET=$?
+        RET=$?
 
-		if [ $RET -eq 1 ]; then
+        if [ $RET -eq 1 ]; then
                 clear
                 return 0
-		elif [ $RET -eq 0 ]; then
-			case "$ADDR" in
-        	1) do_configure_dhcp "$IFACE";;
-        	2) do_configure_static "$IFACE";;
-        	esac
-		fi
+        elif [ $RET -eq 0 ]; then
+            case "$ADDR" in
+            1) do_configure_dhcp "$IFACE";;
+            2) do_configure_static "$IFACE";;
+            esac
+        fi
     fi
 }
 
 do_wifi_ap()
 {
-	
-	local IFACE=$1
+    
+    local IFACE=$1
 
-	# Ask the user for the SSID of the new AP
-	SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
-	if [ -z "$SSID" ]; then
-		clear
-		return 0
-	fi
+    # Ask the user for the SSID of the new AP
+    SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
+    if [ -z "$SSID" ]; then
+        clear
+        return 0
+    fi
 
-	# Set a password. An empty passphrase is allowed and means an open network,
-	# which is what the prompt offers; only Cancel aborts.
-	if ! PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3); then
-		clear
-		return 0
-	fi
+    # Set a password. An empty passphrase is allowed and means an open network,
+    # which is what the prompt offers; only Cancel aborts.
+    if ! PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3); then
+        clear
+        return 0
+    fi
 
-	# Ask for confirmation
-	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
+    # Ask for confirmation
+    if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-		if do_connection_exists "$SSID"; then
-			sudo nmcli connection delete "$SSID"
-		fi
+        if do_connection_exists "$SSID"; then
+            sudo nmcli connection delete "$SSID"
+        fi
 
-		sudo nmcli con add type wifi ifname "$IFACE" con-name "$SSID" autoconnect yes ssid "$SSID"
-		sudo nmcli con modify "$SSID" 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared
-		if [ -n "$PASSWD" ]; then
-			sudo nmcli con modify "$SSID" wifi-sec.key-mgmt wpa-psk
-			sudo nmcli con modify "$SSID" wifi-sec.psk "$PASSWD"
-		fi
+        sudo nmcli con add type wifi ifname "$IFACE" con-name "$SSID" autoconnect yes ssid "$SSID"
+        sudo nmcli con modify "$SSID" 802-11-wireless.mode ap 802-11-wireless.band bg ipv4.method shared
+        if [ -n "$PASSWD" ]; then
+            sudo nmcli con modify "$SSID" wifi-sec.key-mgmt wpa-psk
+            sudo nmcli con modify "$SSID" wifi-sec.psk "$PASSWD"
+        fi
 
-		RET=$(sudo nmcli con up "$SSID" 2>&1)
-		whiptail --title "Notes" --msgbox  "$RET" 10 60
+        RET=$(sudo nmcli con up "$SSID" 2>&1)
+        whiptail --title "Notes" --msgbox  "$RET" 10 60
 
-	fi
+    fi
 
 }
 
 do_wifi_sta()
 {
-	
-	local IFACE=$1
+    
+    local IFACE=$1
 
-	# Ask the user whether she wants to choose from a list of SSID or enter one manually
-	FUN=$(whiptail --menu "Configure SSID:" 15 60 4 "1" "Select SSID from scan list" "2" "Enter SSID manually" 3>&1 1>&2 2>&3)
-	
-	# User cancelled
-	RET=$?
-	if [ $RET -eq 1 ]; then
-		clear
-		return 0
-	fi
+    # Ask the user whether she wants to choose from a list of SSID or enter one manually
+    FUN=$(whiptail --menu "Configure SSID:" 15 60 4 "1" "Select SSID from scan list" "2" "Enter SSID manually" 3>&1 1>&2 2>&3)
+    
+    # User cancelled
+    RET=$?
+    if [ $RET -eq 1 ]; then
+        clear
+        return 0
+    fi
 
-	case "$FUN" in
-		
-		1)
-		
-			# Get list of SSIDs. nmcli pads the column, so strip trailing
-			# blanks or they end up inside the connection name.
-			SSID_LIST=$( sudo nmcli -f SSID device wifi list | tail -n +2 | sed 's/[[:space:]]*$//' | grep -v "^--$" | grep -v "^$" | sort -u )
+    case "$FUN" in
+        
+        1)
+        
+            # Get list of SSIDs. nmcli pads the column, so strip trailing
+            # blanks or they end up inside the connection name.
+            SSID_LIST=$( sudo nmcli -f SSID device wifi list | tail -n +2 | sed 's/[[:space:]]*$//' | grep -v "^--$" | grep -v "^$" | sort -u )
 
-			# Reset: this is a global, and without it a second visit to this
-			# menu shows every SSID from the previous scan as well.
-			ssid_list=()
-			while read -r line; do
-				[ -z "$line" ] && continue
-				ssid_list+=("$line" "$line")
-			done <<< "$SSID_LIST"
+            # Reset: this is a global, and without it a second visit to this
+            # menu shows every SSID from the previous scan as well.
+            ssid_list=()
+            while read -r line; do
+                [ -z "$line" ] && continue
+                ssid_list+=("$line" "$line")
+            done <<< "$SSID_LIST"
 
-			if [ ${#ssid_list[@]} -eq 0 ]; then
-				whiptail --title "Notes" --msgbox "No networks found. Try again or enter the SSID manually." 10 60
-				return 0
-			fi
+            if [ ${#ssid_list[@]} -eq 0 ]; then
+                whiptail --title "Notes" --msgbox "No networks found. Try again or enter the SSID manually." 10 60
+                return 0
+            fi
 
-			# Let the user choose
-			SSID=$(whiptail --notags --menu "Scan List:" 15 60 4 "${ssid_list[@]}" 3>&1 1>&2 2>&3)
-			if [ -z "$SSID" ]; then
-				clear
-				return 0
-			fi
-			;;
+            # Let the user choose
+            SSID=$(whiptail --notags --menu "Scan List:" 15 60 4 "${ssid_list[@]}" 3>&1 1>&2 2>&3)
+            if [ -z "$SSID" ]; then
+                clear
+                return 0
+            fi
+            ;;
 
-		2)
-			
-			# Ask the user the SSID to connect to
-			SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
-			if [ -z "$SSID" ]; then
-				clear
-				return 0
-			fi
-			;;
+        2)
+            
+            # Ask the user the SSID to connect to
+            SSID=$(whiptail --inputbox "Please enter SSID" 10 60 --title "SSID" 3>&1 1>&2 2>&3)
+            if [ -z "$SSID" ]; then
+                clear
+                return 0
+            fi
+            ;;
 
-	esac
+    esac
 
-	# Ask the user the passphrase for the SSID. An empty passphrase is allowed
-	# and means an open network, as the prompt offers; only Cancel aborts.
-	if ! PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3); then
-		clear
-		return 0
-	fi
+    # Ask the user the passphrase for the SSID. An empty passphrase is allowed
+    # and means an open network, as the prompt offers; only Cancel aborts.
+    if ! PASSWD=$(whiptail --passwordbox "Please enter passphrase. Leave it empty if none." 10 60 --title "Passphrase" 3>&1 1>&2 2>&3); then
+        clear
+        return 0
+    fi
 
-	# Ask for confirmation
-	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
+    # Ask for confirmation
+    if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-		if do_connection_exists "$SSID"; then
-			if [ -n "$PASSWD" ]; then
-				sudo nmcli connection modify "$SSID" wifi.mode '' wifi.ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASSWD" ipv4.method auto ipv4.addresses ''
-			else
-				# Turning a secured profile into an open one needs the security
-				# setting removed outright. Clearing wifi-sec.key-mgmt on its own
-				# fails with "property is missing", and that aborts the whole
-				# modify call, so nothing else in it gets applied either.
-				sudo nmcli connection modify "$SSID" remove 802-11-wireless-security
-				sudo nmcli connection modify "$SSID" wifi.mode '' wifi.ssid "$SSID" ipv4.method auto ipv4.addresses ''
-			fi
-		else
-			if [ -n "$PASSWD" ]; then
-				sudo nmcli connection add con-name "$SSID" ifname "$IFACE" type wifi ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASSWD"
-			else
-				sudo nmcli connection add con-name "$SSID" ifname "$IFACE" type wifi ssid "$SSID"
-			fi
-		fi
+        if do_connection_exists "$SSID"; then
+            if [ -n "$PASSWD" ]; then
+                sudo nmcli connection modify "$SSID" wifi.mode '' wifi.ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASSWD" ipv4.method auto ipv4.addresses ''
+            else
+                # Turning a secured profile into an open one needs the security
+                # setting removed outright. Clearing wifi-sec.key-mgmt on its own
+                # fails with "property is missing", and that aborts the whole
+                # modify call, so nothing else in it gets applied either.
+                sudo nmcli connection modify "$SSID" remove 802-11-wireless-security
+                sudo nmcli connection modify "$SSID" wifi.mode '' wifi.ssid "$SSID" ipv4.method auto ipv4.addresses ''
+            fi
+        else
+            if [ -n "$PASSWD" ]; then
+                sudo nmcli connection add con-name "$SSID" ifname "$IFACE" type wifi ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASSWD"
+            else
+                sudo nmcli connection add con-name "$SSID" ifname "$IFACE" type wifi ssid "$SSID"
+            fi
+        fi
 
-		sudo nmcli connection reload
-		RET=$(sudo nmcli connection up "$SSID" 2>&1)
-		whiptail --title "Notes" --msgbox  "$RET" 10 60
+        sudo nmcli connection reload
+        RET=$(sudo nmcli connection up "$SSID" 2>&1)
+        whiptail --title "Notes" --msgbox  "$RET" 10 60
 
     fi
 
@@ -285,88 +285,92 @@ do_configure_wifi()
         iface_list+=("$line" "$line")
     done <<< "$IFACES"
 
-	if [ ${#iface_list[@]} -eq 0 ]; then
-		whiptail --title "Notes" --msgbox "No WiFi interfaces found." 10 60
-		return 0
-	fi
+    if [ ${#iface_list[@]} -eq 0 ]; then
+        whiptail --title "Notes" --msgbox "No WiFi interfaces found." 10 60
+        return 0
+    fi
 
-	IFACE=$(whiptail --notags --title " Configure WIFI" --menu "Select Interface:" 15 60 4 "${iface_list[@]}" 3>&1 1>&2 2>&3)
-	RET=$?
+    IFACE=$(whiptail --notags --title " Configure WIFI" --menu "Select Interface:" 15 60 4 "${iface_list[@]}" 3>&1 1>&2 2>&3)
+    RET=$?
 
     if [ $RET -eq 1 ]; then
                 clear
                 return 0
     elif [ $RET -eq 0 ]; then
-		FUN=$(whiptail --title "Configure WIFI" --menu "Select WIFI mode:" 15 60 4 \
+        FUN=$(whiptail --title "Configure WIFI" --menu "Select WIFI mode:" 15 60 4 \
                 1 "Client mode" \
                 2 "Access Point mode" \
                 3>&1 1>&2 2>&3)
-		RET=$?
+        RET=$?
 
-    	if [ $RET -eq 1 ]; then
+        if [ $RET -eq 1 ]; then
                 clear
                 return 0
-    	elif [ $RET -eq 0 ]; then
-        	case "$FUN" in
-        		1) do_wifi_sta "$IFACE";;
-				2) do_wifi_ap "$IFACE";;
-			esac
-		fi
-	fi
+        elif [ $RET -eq 0 ]; then
+            case "$FUN" in
+                1) do_wifi_sta "$IFACE";;
+                2) do_wifi_ap "$IFACE";;
+            esac
+        fi
+    fi
 }
 
 do_configure_lte()
 {
-	APN=$(whiptail --inputbox "Please enter APN" 10 60 --title "APN" 3>&1 1>&2 2>&3)
-	
-	if [ -z "$APN" ]; then
-		clear
-		return 0
-	fi
-	PIN=$(whiptail --inputbox "Please enter PIN Leave it empty if none." 10 60 --title "PIN" 3>&1 1>&2 2>&3)
-	
+    APN=$(whiptail --inputbox "Please enter APN" 10 60 --title "APN" 3>&1 1>&2 2>&3)
+    
+    if [ -z "$APN" ]; then
+        clear
+        return 0
+    fi
+    PIN=$(whiptail --inputbox "Please enter PIN Leave it empty if none." 10 60 --title "PIN" 3>&1 1>&2 2>&3)
+    
     if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
         if do_connection_exists "gsm"; then
 
-			if [ -z "$PIN" ]; then
-				sudo nmcli connection modify "gsm" gsm.apn "$APN" gsm.pin ''
-			else
-				sudo nmcli connection modify "gsm" gsm.apn "$APN" gsm.pin "$PIN"
-			fi
-		else
-			if [ -z "$PIN" ]; then
-				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn "$APN" 
-			else
-				sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn "$APN" gsm.pin "$PIN"
-			fi
+            if [ -z "$PIN" ]; then
+                # Set the APN on its own first. Clearing a property can fail
+                # ("property is missing"), and that aborts the whole modify
+                # call, so a combined command would drop the APN too.
+                sudo nmcli connection modify "gsm" gsm.apn "$APN"
+                sudo nmcli connection modify "gsm" gsm.pin ''
+            else
+                sudo nmcli connection modify "gsm" gsm.apn "$APN" gsm.pin "$PIN"
+            fi
+        else
+            if [ -z "$PIN" ]; then
+                sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn "$APN" 
+            else
+                sudo nmcli c add type gsm ifname cdc-wdm0 con-name gsm apn "$APN" gsm.pin "$PIN"
+            fi
         fi
-		RET=$(sudo nmcli connection up gsm 2>&1)
-		whiptail --title "Notes" --msgbox  "$RET" 10 60	
+        RET=$(sudo nmcli connection up gsm 2>&1)
+        whiptail --title "Notes" --msgbox  "$RET" 10 60	
     else
         return 0
     fi
-	
+    
 }
 
 do_network_main_menu()
 {
-	FUN=$(whiptail --title "Network" --menu "" 15 60 4 \
+    FUN=$(whiptail --title "Network" --menu "" 15 60 4 \
                 1 "Configure Ethernet" \
                 2 "Configure WiFi" \
                 3 "Configure LTE" \
-		--cancel-button Back	3>&1 1>&2 2>&3)
+        --cancel-button Back	3>&1 1>&2 2>&3)
     RET=$?
 
-	if [ $RET -eq 1 ]; then
+    if [ $RET -eq 1 ]; then
         clear
         return 0
-	elif [ $RET -eq 0 ]; then
-		case "$FUN" in
-		1) do_configure_ethernet;;
-		2) do_configure_wifi;;
-		3) do_configure_lte;;
-		esac
-	fi
+    elif [ $RET -eq 0 ]; then
+        case "$FUN" in
+        1) do_configure_ethernet;;
+        2) do_configure_wifi;;
+        3) do_configure_lte;;
+        esac
+    fi
 
 }
