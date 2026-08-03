@@ -202,6 +202,14 @@ do_ask_for_confirmation() {
     fi
 }
 
+# Absolute path of the compose file for a service. Both callers used to build
+# this themselves, one relative and one absolute, under the same variable name.
+do_get_stackfile_path() {
+    local stackfile
+    stackfile=$(jq -r --arg service_to_start "$1" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' "${DIR_CNF}/portainer_app_template.json")
+    printf '%s' "${DIR_CNF}/${stackfile}"
+}
+
 # Gets a root property for a service from the Portainer JSON file
 do_get_property() {
     local service=$1
@@ -231,8 +239,8 @@ do_check_service_type() {
         fi
     else
 
-        yml_file_path="./$(jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' "${DIR_CNF}/portainer_app_template.json" | tr -d '"')"
-        tmp_name_list=$(grep container_name "${DIR_CNF}/${yml_file_path}" | awk '{print $2}')
+        yml_file_path=$(do_get_stackfile_path "$service_to_start")
+        tmp_name_list=$(grep container_name "${yml_file_path}" | awk '{print $2}')
         
         exist=0
         for tmp_name in $tmp_name_list; do
@@ -364,7 +372,7 @@ do_docker_run() {
 do_docker_compose_up() {
     
     # Get yaml path
-    yml_file_path=${DIR_CNF}/$( jq --arg service_to_start "$service_to_start" '.templates[] | select(.title==$service_to_start) | .repository.stackfile' "${DIR_CNF}/portainer_app_template.json" | tr -d '"' )
+    yml_file_path=$(do_get_stackfile_path "$service_to_start")
 
     # Get folder path
     yml_folder=$( dirname -- "$yml_file_path" )
@@ -405,7 +413,15 @@ do_get_host_ip() {
             fi
         done
         # The IP of the first enabled interface
-        HOST_IP=${ips[0]}
+        HOST_IP=${ips[0]:-}
+    fi
+
+    # Fall back rather than substitute an empty string into the post-up notes
+    if [ -z "$HOST_IP" ]; then
+        HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+    if [ -z "$HOST_IP" ]; then
+        HOST_IP="<this host>"
     fi
 }
 
@@ -418,17 +434,25 @@ do_print_post_up_info() {
     do_get_host_ip
     post_up_info=${post_up_info//\{host-ip\}/${HOST_IP}}
 
-    # Show Gateway EUI for packet forwarders
-    if [[ $service_to_start == "LoRa Basics™ Station for Docker" ]] || [[ $service_to_start == "UDP Packet Forwarder" ]] || [[ $service_to_start == "2.4GHz Gateway UDP Packet Forwarder" ]]; then
-        container_name_raw=$(do_get_property "$service_to_start" name)
-        docker_container_id=$(docker ps -aqf name="${container_name_raw}")
-        sleep 5
-        GATEWAY_EUI=$(docker exec -it "${container_name_raw}" gateway_eui  | tr '[:lower:]' '[:upper:]' | cut -d' ' -f3)
+    # Show the Gateway EUI when the container can report one. Asking the
+    # container is data driven: matching on service titles missed any packet
+    # forwarder not in the hard-coded list, and broke when a title changed.
+    GATEWAY_EUI=""
+    docker_container_id=""
+    container_name_raw=$(do_get_property "$service_to_start" name)
+    if [ "$container_name_raw" != "null" ]; then
+        docker_container_id=$(docker ps -aqf name="^${container_name_raw}$")
+        if [ -n "$docker_container_id" ] && docker exec "${container_name_raw}" sh -c 'command -v gateway_eui' > /dev/null 2>&1; then
+            # the entry point needs a moment before the helper returns the EUI
+            sleep 5
+            GATEWAY_EUI=$(docker exec "${container_name_raw}" gateway_eui | tr '[:lower:]' '[:upper:]' | cut -d' ' -f3)
+        fi
+    fi
+
+    if [ -n "$GATEWAY_EUI" ]; then
         whiptail --title "Notes" --msgbox "Container id : $docker_container_id \nGateway EUI  : $GATEWAY_EUI \n \n$post_up_info" 30 78
-    
-    # The rest
     else
-        whiptail --title "Notes" --msgbox  "$post_up_info" 30 78 
+        whiptail --title "Notes" --msgbox  "$post_up_info" 30 78
     fi
 
 }

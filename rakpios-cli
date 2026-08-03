@@ -27,6 +27,9 @@ repo="rakpios-cli"
 
 function __msg_debug(){
     [[ "${DEBUG}" == "1" ]] && echo -e "[DEBUG] $*"
+    # never report failure: this is the last statement of several functions,
+    # and with DEBUG off the test above would make them all return 1
+    return 0
 }
 
 # usage information
@@ -101,27 +104,27 @@ main() {
         exit 0
     fi
 
-    # start the rakpios-cli if no options is passed to the script
-    if [[ $OPTIND -eq 1 ]]; then
-        # Configure tmux for the log viewer.
-        # This is written to a tool-owned file and passed to tmux with -f, so the
-        # user's own ~/.tmux.conf is never read, modified or overwritten.
-        # Written here rather than before do_install, which clears DIR_CNF.
-        mkdir -p "${DIR_CNF}"
-        printf '%s\n' \
-            "set-option -g mouse on" \
-            "bind-key -n C-C confirm-before kill-session" \
-            > "${TMUX_CONF}"
+    # No action flag was given, so run the menu.
+    # --help, --version, --install and --upgrade have all exited by this point.
 
-        # shellcheck source=/dev/null
-        source "${DIR_LIB_TOOL}/rakpios-cli-network-manage"
-        # shellcheck source=/dev/null
-        source "${DIR_LIB_TOOL}/rakpios-cli-service-deploy"
-        # shellcheck source=/dev/null
-        source "${DIR_LIB_TOOL}/rakpios-cli-service-list"
-        do_check_for_update
-        do_rakpios_cli_menu
-    fi
+    # Configure tmux for the log viewer.
+    # This is written to a tool-owned file and passed to tmux with -f, so the
+    # user's own ~/.tmux.conf is never read, modified or overwritten.
+    # Written here rather than before do_install, which clears DIR_CNF.
+    mkdir -p "${DIR_CNF}"
+    printf '%s\n' \
+        "set-option -g mouse on" \
+        "bind-key -n C-C confirm-before kill-session" \
+        > "${TMUX_CONF}"
+
+    # shellcheck source=/dev/null
+    source "${DIR_LIB_TOOL}/rakpios-cli-network-manage"
+    # shellcheck source=/dev/null
+    source "${DIR_LIB_TOOL}/rakpios-cli-service-deploy"
+    # shellcheck source=/dev/null
+    source "${DIR_LIB_TOOL}/rakpios-cli-service-list"
+    do_check_for_update
+    do_rakpios_cli_menu
 }
 
 do_check_dependencies() {
@@ -129,6 +132,7 @@ do_check_dependencies() {
     # check for necessary tools
     # docker will be checked separately
     need_cmd curl
+    need_cmd git
     need_cmd jq
     need_cmd unzip
     need_cmd whiptail
@@ -187,8 +191,7 @@ do_clean_up(){
 
 # Check install directory
 do_check_directory() {
-    declare FILES=${*:-$(</dev/stdin)}
-    for PARAM in $FILES; do
+    for PARAM in "$@"; do
         # do what needs to be done on each input value
         if test -d "$PARAM"; then
             __msg_debug "$PARAM exists"
@@ -200,8 +203,8 @@ do_check_directory() {
 }
 
 do_fresh_install() {
-    
-    do_check_dependencies
+
+    # dependencies are already checked in main()
     do_clean_up
     do_print_install_location
     do_check_directory "${DIR_TMP}" "${DIR_CNF}" "${DIR_BIN}" "${DIR_LIB_TOOL}"
@@ -302,14 +305,34 @@ need_cmd() {
     local COMMAND="$1"
 
     if ! check_cmd "$COMMAND"; then
-        read -rp "Missing dependency: '$COMMAND'. Do you want to install it now? [y/N]: " RESPONSE
-        if [[ "$RESPONSE" != "y" ]]; then
-            echo "Quitting..."
-            exit 0
+
+        if [ "$SILENT" == "1" ]; then
+            echo "Missing dependency: '$COMMAND'. Installing it..."
+        else
+            # Read the answer from the terminal, not from stdin. The documented
+            # install pipes this script into bash, so stdin is the script itself
+            # and a plain read would swallow the next line of code as the answer.
+            local PROMPT="Missing dependency: '$COMMAND'. Do you want to install it now? [y/N]: "
+            if [ -t 0 ]; then
+                read -rp "$PROMPT" RESPONSE
+            elif ( exec < /dev/tty ) 2>/dev/null; then
+                # -r is not enough: /dev/tty exists but cannot be opened when
+                # there is no controlling terminal, so try opening it for real
+                read -rp "$PROMPT" RESPONSE < /dev/tty
+            else
+                echo "Missing dependency: '$COMMAND', and there is no terminal to ask."
+                echo "Install it and run this again, or use --silent."
+                exit 1
+            fi
+            case "$RESPONSE" in
+                [yY]|[yY][eE][sS]) ;;
+                *) echo "Quitting..."; exit 0 ;;
+            esac
         fi
+
         sudo apt install "$COMMAND" -y
     fi
-    
+
 }
 
 # function to check whether command is installed or not
@@ -333,8 +356,11 @@ do_get_version_information() {
         remote_version_portainer_json=$(curl -s $REMOTE_VERSION_URL_portainer_json | jq '.version_for_rakpios_cli' | tr -d '"')
         local_version_portainer_json=$(jq '.version_for_rakpios_cli' "${DIR_CNF}/portainer_app_template.json" | tr -d '"')
         
-        # use github tag to track rakpios-cli version
-        remote_version_rakpios_cli=$(curl https://api.github.com/repos/${org}/${repo}/releases/latest -s | jq .tag_name -r)
+        # use github tag to track rakpios-cli version. The local side records a
+        # git tag, so read tags here too: the releases API reports the latest
+        # *release*, which can lag the latest tag and made an up-to-date install
+        # look newer than the remote.
+        remote_version_rakpios_cli=$(git ls-remote --tags --refs "https://github.com/${org}/${repo}.git" 2>/dev/null | awk -F/ '{print $NF}' | sort -V | tail -1)
         
         # retrieve the local git tag
         local_version_rakpios_cli=$(cat "${DIR_CNF}/rakpios-cli.version")
