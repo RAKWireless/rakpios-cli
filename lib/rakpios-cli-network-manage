@@ -1,22 +1,61 @@
 #!/bin/bash
 
+# Finds the NetworkManager connection bound to an interface, printing its name
+# or nothing if there is none.
+#
+# The profile file is NOT reliably named after the interface: a stock system
+# calls the eth0 profile "Wired connection 1", so deriving
+# /etc/NetworkManager/system-connections/eth0.nmconnection finds nothing and the
+# existing connection is never touched. Ask NetworkManager instead of guessing.
+do_get_connection_for_iface()
+{
+	local IFACE=$1
+	local line
+
+	# a connection currently active on the device. DEVICE never contains a
+	# colon, so split on the last one: connection names may contain colons.
+	while IFS= read -r line; do
+		if [ "${line##*:}" = "$IFACE" ]; then
+			printf '%s' "${line%:*}"
+			return 0
+		fi
+	done < <(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null)
+
+	# otherwise a profile bound to the interface but not currently up
+	while IFS= read -r line; do
+		if [ "$(nmcli -t -g connection.interface-name connection show "$line" 2>/dev/null)" = "$IFACE" ]; then
+			printf '%s' "$line"
+			return 0
+		fi
+	done < <(nmcli -t -f NAME connection show 2>/dev/null)
+
+	return 1
+}
+
+# Returns 0 if a NetworkManager connection with exactly this name exists.
+# Used instead of testing for a .nmconnection file, whose name NetworkManager
+# chooses itself and which is only readable by root.
+do_connection_exists()
+{
+	nmcli -t -f NAME connection show 2>/dev/null | grep -Fxq "$1"
+}
+
 do_configure_dhcp()
 {
 
 	local NAME=$1
-	FILE="/etc/NetworkManager/system-connections/$NAME.nmconnection"
+	local CON
+	CON=$(do_get_connection_for_iface "$NAME")
 
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-		# When no profile exists yet the connection has to be created, the same way
-		# do_configure_static does. Without this the DHCP option silently did nothing.
-		if [ -e "$FILE" ]; then
-			sudo nmcli connection modify filename "$FILE" ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
-			RET=$(sudo nmcli connection up filename "$FILE" 2>&1)
+		# Reconfigure the interface's existing connection when there is one.
+		# Creating a second profile for the same interface would compete with it.
+		if [ -n "$CON" ]; then
+			sudo nmcli connection modify "$CON" ipv4.addresses '' ipv4.gateway '' ipv4.dns '' ipv4.method auto
+			RET=$(sudo nmcli connection up "$CON" 2>&1)
 		else
 			sudo nmcli connection add con-name "$NAME" ifname "$NAME" type ethernet ipv4.method auto
-			# Bring it up by name: NetworkManager chooses the file name itself,
-			# so "$FILE" is not guaranteed to exist even now.
 			RET=$(sudo nmcli connection up "$NAME" 2>&1)
 		fi
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
@@ -29,7 +68,8 @@ do_configure_static()
 {
 
 	local NAME=$1
-	FILE="/etc/NetworkManager/system-connections/$NAME.nmconnection"
+	local CON
+	CON=$(do_get_connection_for_iface "$NAME")
 
 	IP=$(whiptail --inputbox "input IP address/prefix" 10 60 "192.168.240.100/24" --title "IP address" 3>&1 1>&2 2>&3)
 	if [ -z "$IP" ]; then
@@ -47,13 +87,12 @@ do_configure_static()
 		return 0
 	fi
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then    					
-		if [ -e "$FILE" ]; then
-			sudo nmcli connection modify filename "$FILE" ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
-			RET=$(sudo nmcli connection up filename "$FILE" 2>&1)
+		# As above: reconfigure the interface's existing connection if it has one
+		if [ -n "$CON" ]; then
+			sudo nmcli connection modify "$CON" ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
+			RET=$(sudo nmcli connection up "$CON" 2>&1)
 		else
 			sudo nmcli connection add con-name "$NAME" ifname "$NAME" type ethernet ipv4.addresses "$IP" ipv4.gateway "$GW" ipv4.dns "$DNS" ipv4.method manual
-			# Bring it up by name: NetworkManager chooses the file name itself,
-			# so "$FILE" is not guaranteed to exist even now.
 			RET=$(sudo nmcli connection up "$NAME" 2>&1)
 		fi
 		whiptail --title "Notes" --msgbox  "$RET" 10 60
@@ -124,11 +163,8 @@ do_wifi_ap()
 	# Ask for confirmation
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-		FILE="/etc/NetworkManager/system-connections/$SSID.nmconnection"
-		if [ -e "$FILE" ]; then
-			# Deleting by path needs the "filename" selector; passing the path as
-			# an id matches nothing. Needs sudo like every other nmcli call here.
-			sudo nmcli connection delete filename "$FILE"
+		if do_connection_exists "$SSID"; then
+			sudo nmcli connection delete "$SSID"
 		fi
 
 		sudo nmcli con add type wifi ifname "$IFACE" con-name "$SSID" autoconnect yes ssid "$SSID"
@@ -211,12 +247,16 @@ do_wifi_sta()
 	# Ask for confirmation
 	if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-		FILE="/etc/NetworkManager/system-connections/$SSID.nmconnection"
-		if [ -e "$FILE" ]; then
+		if do_connection_exists "$SSID"; then
 			if [ -n "$PASSWD" ]; then
-				sudo nmcli connection modify filename "$FILE" wifi.mode '' wifi.ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASSWD" ipv4.method auto ipv4.addresses ''
+				sudo nmcli connection modify "$SSID" wifi.mode '' wifi.ssid "$SSID" wifi-sec.key-mgmt wpa-psk wifi-sec.psk "$PASSWD" ipv4.method auto ipv4.addresses ''
 			else
-				sudo nmcli connection modify filename "$FILE" wifi.mode '' wifi.ssid "$SSID" wifi-sec.key-mgmt '' wifi-sec.psk '' ipv4.method auto ipv4.addresses ''
+				# Turning a secured profile into an open one needs the security
+				# setting removed outright. Clearing wifi-sec.key-mgmt on its own
+				# fails with "property is missing", and that aborts the whole
+				# modify call, so nothing else in it gets applied either.
+				sudo nmcli connection modify "$SSID" remove 802-11-wireless-security
+				sudo nmcli connection modify "$SSID" wifi.mode '' wifi.ssid "$SSID" ipv4.method auto ipv4.addresses ''
 			fi
 		else
 			if [ -n "$PASSWD" ]; then
@@ -285,15 +325,14 @@ do_configure_lte()
 	fi
 	PIN=$(whiptail --inputbox "Please enter PIN Leave it empty if none." 10 60 --title "PIN" 3>&1 1>&2 2>&3)
 	
-	FILE="/etc/NetworkManager/system-connections/gsm.nmconnection"
     if (whiptail --yes-button "Enable" --no-button "Cancel"  --yesno "Enable your configuration?" 10 60) then
 
-        if [ -e "$FILE" ]; then
-	
+        if do_connection_exists "gsm"; then
+
 			if [ -z "$PIN" ]; then
-				sudo nmcli connection modify filename "$FILE" gsm.apn "$APN" gsm.pin ''
+				sudo nmcli connection modify "gsm" gsm.apn "$APN" gsm.pin ''
 			else
-				sudo nmcli connection modify filename "$FILE" gsm.apn "$APN" gsm.pin "$PIN"
+				sudo nmcli connection modify "gsm" gsm.apn "$APN" gsm.pin "$PIN"
 			fi
 		else
 			if [ -z "$PIN" ]; then
